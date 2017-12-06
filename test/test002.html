@@ -1,0 +1,23 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+    <style>
+      div.heightOne {
+        width: 50%;
+        height: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {
+        document.write('<div class="heightOne"><img src="' + window.test_images[i] + '" /></div>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var djs = new DemandJS();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <JSBabel Include="*.js" Exclude="demandjs.min.js;demandjs.debug.js" />
+  </ItemGroup>
+  <PropertyGroup>
+    <JSBabelOutputDir>babel_generated</JSBabelOutputDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <JSBabelOutput Include="@(JSBabel -> 'babel_generated\%(Filename)%(Extension)')" />
+  </ItemGroup>
+  <PropertyGroup>
+    <MinifiedJS>demandjs.min.js</MinifiedJS>
+    <UnminifiedJS>demandjs.debug.js</UnminifiedJS>
+  </PropertyGroup>
+  <Target Name="BabelCompile" BeforeTargets="Compile" Inputs="@(JSBabel)" Outputs="@(JSBabelOutput)">
+    <Message Importance="high" Text="$(MSBuildProjectDirectory)\node_modules\.bin\babel %(Identity) -o @(JSBabel -> 'babel_generated\%(Filename)%(Extension)') " />
+    <Exec Command="$(MSBuildProjectDirectory)\node_modules\.bin\babel %(Identity) -o @(JSBabel -> 'babel_generated\%(Filename)%(Extension)') -s true" />
+  </Target>
+  <Target Name="BabelCompileDebug" BeforeTargets="Compile" Inputs="@(JSBabel)" Outputs="$(UnminifiedJS)">
+    <Message Importance="high" Text="$(MSBuildProjectDirectory)\node_modules\.bin\babel @(JSBabel -> ' %(Identity) ', ' ') -o $(UnminifiedJS) -s true" />
+    <Exec Command="$(MSBuildProjectDirectory)\node_modules\.bin\babel @(JSBabel -> ' %(Identity) ', ' ') -o $(UnminifiedJS) -s true" />
+  </Target>
+  <ItemGroup>
+    <JSClosure Include="babel_generated\*.js" />
+  </ItemGroup>
+  <Target Name="ClosureCompileMinified" AfterTargets="BabelCompile" BeforeTargets="Compile" Inputs="@(JSBabelOutput)" Outputs="demandjs.min.js">
+    <Message Importance="high" Text="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
+    <Exec Command="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
+  </Target>
+</Project>
