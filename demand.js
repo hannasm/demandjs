@@ -205,7 +205,9 @@
         createErrorNode: t=>this.createErrorNode(),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
-        selector: 'img,video,iframe,link.demand'
+        selector: 'img,video,iframe,link.demand',
+        rootMargin: '48px',
+        threshold: 0
       }, options);
       this.mutation = new MutationObserver((a,b)=>this.observeMutation(a,b));
       this.mutationOptions = {
@@ -215,8 +217,8 @@
 
       this.intersectionOptions = {
         root: null,
-        rootMargin: '48px',
-        threshold: 0.1
+        rootMargin:this.options.rootMargin,
+        threshold:this.options.threshold 
       };
       this.intersection = new IntersectionObserver( (a,b)=>this.observeIntersection(a,b), this.intersectionOptions);
 

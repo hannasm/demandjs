@@ -526,7 +526,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.intersectionOptions = {
         root: null,
         rootMargin: '48px',
-        threshold: 0.1
+        threshold: 0
       };
       this.intersection = new IntersectionObserver(function (a, b) {
         return _this3.observeIntersection(a, b);
