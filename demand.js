@@ -19,10 +19,11 @@
         this.beginLoad(reg);   
       }
     }
-    beginLoad(registration) {
-      if (registration.extraData.isLink &&
-          registration.extraData.hasHref) {
+    beginLoad(target) {
+      var {target, registration} = this.resolveTarget(target);
+      if (registration.extraData.shouldInjectHtml) {
         let url = registration.extraData.href;
+        this.options.onLoadBegin(target);
         fetch(url).then(function (response) {
           if (!response.ok) {
             throw Error(response.status + '_' + response.statusText);
@@ -33,11 +34,9 @@
         }).catch(ex=>{
           this.onLoadError(registration, ex);
         });
-      } else if (registration.extraData.hasSrc) {
-        registration.target.addEventListener('load', evt=>this.onLoadComplete(registration));
-        registration.target.addEventListener('error', evt=>this.onLoadError(registration, evt));
-        // setTimeout helps here helps keep loading animations smooth
-        setTimeout(()=>registration.target.setAttribute('src', registration.extraData.src), 0);
+      } else if (registration.extraData.shouldRestore) {
+        // setTimeout helps keep loading animations smooth
+        setTimeout(()=>this.restoreTarget(registration), 0);
       } else {
         throw 'Unknown load operation';
       }
@@ -46,13 +45,9 @@
       return target.complete || false;
     }
     injectLink(target, txt) {
-      if (target.href.match(/\.html$/i)) {
-        let reg = this.phRegistry.get(target);
-        this.injectHtml(target, txt);
-        this.onLoadComplete(reg);
-      } else {
-        throw Error('Not implemented link injection with url ' + target.href);
-      }
+      let reg = this.phRegistry.get(target);
+      this.injectHtml(target, txt);
+      this.onLoadComplete(reg);
     }
     injectScript(target, id, code) {
       var oldDw = document.write;
@@ -96,7 +91,8 @@
         }
       }
     }
-    onLoadComplete(registration) {
+    onLoadComplete(target) {
+      var {target, registration} = this.resolveTarget(target);
       let first = this.options.shouldInsertOnLoad(registration.target);
       for (var placeholder of registration.placeholders) {
         if (first) {
@@ -106,6 +102,8 @@
         this.cleanupPlaceholder(placeholder);
       }
       this.cleanupRegistrationTarget(registration);
+      this.options.onLoadEnd(target);
+      this.options.onLoadComplete(target);
     }
     cleanupPlaceholder(placeholder) {
         this.intersection.unobserve(placeholder);
@@ -115,8 +113,10 @@
     cleanupRegistrationTarget(registration) {
       this.intersection.unobserve(registration.target); // this only necesarry when we didnt remove the item
       this.phRegistry.delete(registration.target);
+      this.loaded.set(registration.target, true);
     }
-    onLoadError(registration, evt) {
+    onLoadError(target, evt) {
+      var {target, registration} = this.resolveTarget(target);
       let first = true;
       for (var placeholder of registration.placeholders) {
         if (first) {
@@ -130,40 +130,144 @@
       }
 
       this.cleanupRegistrationTarget(registration);
+      this.options.onLoadError(target);
+      this.options.onLoadComplete(target);
     }
     createErrorNode() {
       var ele = document.createElement('div');
-      ele.innerHTML = this.options.errorHTML;
+      ele.innerHTML = this.options.errorHtml;
       return Array.prototype.slice.call(ele.childNodes);
     }
     createPlaceholder() {
       var ele = document.createElement('div');
-      ele.innerHTML = this.options.pendingHTML;
+      ele.innerHTML = this.options.pendingHtml;
       return Array.prototype.slice.call(ele.childNodes);
     }
     registerPlaceholder(node, target, placeholders, extraData) {
-      this.phRegistry.set(node, {
+      var result = {
+        isRegistration: true,
         target: target,
         node: node,
         placeholders: placeholders,
         extraData: extraData,
         loading: false
-      });
+      };
+      this.phRegistry.set(node, result);
+      return result;
+    }
+    resolveTarget(target) {
+      var registration = target;
+      if (!('isRegistration' in target) || !(target.isRegistration)) {
+        registration = this.phRegistry.get(target);
+      } else { 
+        target = registration.target;
+      }
+      return {
+        target: target,
+        registration: registration
+      };
+    }
+    restoreTarget(target) {
+      var {target, registration} = this.resolveTarget(target);
+      var extraData = registration.extraData;
+      registration.loading = true;
+      this.options.onLoadBegin(target);
+
+      this._restoreTargetInternal(target, extraData);
+
+      if (!extraData.canLoad) {
+        this.onLoadComplete(registration);
+      }
+    }
+    _restoreTargetInternal(target, extraData) {
+      if (extraData.hasSrcset) {
+        target.setAttribute('srcset', extraData.srcset);
+      }
+      if (extraData.hasSizes) {
+        target.setAttribute('sizes', extraData.sizes);
+      }
+      if (extraData.hasSrc) {
+        target.setAttribute('src', extraData.src);
+      }
+      if (extraData.children.length > 0) {
+        for (var i = 0; i < extraData.children.length; i++) {
+          var childData = extraData.children[i];
+          this._restoreTargetInternal(childData.target, childData);
+        }
+      }
+    }
+    captureTarget(target, targetRoot) {
+      var store = {
+        'target': target,
+        'hasSrc':  target.hasAttribute('src'),
+        'src':  target.getAttribute('src'),
+        'hasSrcset': target.hasAttribute('srcset'),
+        'srcset': target.getAttribute('srcset'),
+        'hasSizes': target.hasAttribute('sizes'),
+        'sizes': target.getAttribute('sizes'),
+        'isLink': ('tagName' in target) && (target.tagName.match(/link/i)),
+        'hasHref': target.hasAttribute('href'),
+        'href': target.getAttribute('href'),
+        'children': [],
+        'shouldRestore': false,
+        'canLoad': false,
+        'shouldInjectHtml': false
+      };
+      if (store.hasSrc) {
+        target.removeAttribute('src');
+      }
+      if (store.hasSrcset) {
+        target.removeAttribute('srcset');
+      }
+      if (store.hasSizes) {
+        target.removeAttribute('sizes');
+      }
+
+      if (store.isLink && store.hasHref) {
+        store.shouldInjectHtml = true;
+      }
+
+
+      // We do not care about load events of child elements
+      if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
+        store.shouldRestore = true;
+        store.canLoad = true;
+        target.addEventListener('load', evt=>this.onLoadComplete(targetRoot));
+        target.addEventListener('error', evt=>this.onLoadError(targetRoot, evt));
+      }
+
+      if ('tagName' in target && target.tagName.match(/picture|video|audio/i)) {
+        if (target === targetRoot) {
+          store.shouldRestore = true;
+        }
+        for (var i = 0; i < target.children.length; i++) {
+          var child = target.children[i];
+          var desc = this.captureTarget(child);
+          desc.index = i;
+          store.children.push(desc);
+        }
+      }
+
+      return store;
+    }
+    isContextExcluded(target) {
+      if (!target) { return false; }
+      if (!('parentNode' in target)) { return false; }
+      var parent = target.parentNode;
+      if (!parent) { return false; }
+      if (!('tagName' in parent)) { return false; }
+      if (parent.tagName.match(/picture|video|audio/i)) { return true; }
+
+      // need to recurse up for cases like video with embedded html as a fallback
+      return this.isContextExcluded(parent);
     }
     observeTarget(target) {
       if (this.isLoaded(target)) {
-        
+        // do nothing, its already fully loaded
+      } else if (this.isContextExcluded(target)) { 
+        // do nothing, another element should take care of it
       } else {
-        var store = {
-          'hasSrc':  target.hasAttribute('src'),
-          'src':  target.getAttribute('src'),
-          'isLink': ('tagName' in target) && (target.tagName.match(/link/i)),
-          'hasHref': target.hasAttribute('href'),
-          'href': target.getAttribute('href')
-        };
-        if (store.hasSrc) {
-          target.removeAttribute('src');
-        }
+        var store = this.captureTarget(target, target);
         var placeholders = this.options.createPlaceholder(target);
         for (var placeholder of placeholders) {
           this.registerPlaceholder(placeholder, target, placeholders, store);
@@ -184,6 +288,7 @@
       }
     }
     isTargetMatch(target) {
+      if (this.loaded.has(target)) { return false; }
       return 'matches' in target && target.matches(this.options.selector);
     }
     queryTargets() {
@@ -198,16 +303,21 @@
     }
     constructor(options) {
       this.phRegistry = new WeakMap();
+      this.loaded = new WeakMap();
       this.options = Object.assign({
-        pendingHTML: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        errorHTML: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
+        pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
+        errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
         createPlaceholder: t=>this.createPlaceholder(),
         createErrorNode: t=>this.createErrorNode(),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
-        selector: 'img,video,iframe,link.demand',
+        selector: 'img,video,picture,iframe,link.demand',
         rootMargin: '48px',
-        threshold: 0
+        threshold: 0,
+        onLoadBegin: t=>{},
+        onLoadEnd: t=>{},
+        onLoadError: t=>{},
+        onLoadComplete: t=>{}
       }, options);
       this.mutation = new MutationObserver((a,b)=>this.observeMutation(a,b));
       this.mutationOptions = {

@@ -30,6 +30,16 @@
     'https://images.unsplash.com/photo-1452993912631-49cff82efb5e',
     'https://images.unsplash.com/photo-1437419764061-2473afe69fc2'
   ];
+  window.test_image_suffixes = {
+    'small': '?ixlib=rb-0.3.5&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=400&fit=max&s=f82c1b2283e2d580a6dc4fb3705b2c79',
+    'thumb': '?ixlib=rb-0.3.5&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=200&fit=max&s=30eb50a990275971a8e9f9e2c7b87764',
+    'regular': '?ixlib=rb-0.3.5&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&s=feccda0a0a589cf0b24ec143095d0216',
+    'full': '?ixlib=rb-0.3.5&q=85&fm=jpg&crop=entropy&cs=srgb&s=2e1e98c6d421d86b27c2fcc0f39f4abd'
+  };
+
+
+
+
   window.test_images_cite = 'https://unsplash.com/collections/330408/in-demand';
 }
 )();

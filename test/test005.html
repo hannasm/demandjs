@@ -4,12 +4,11 @@
     <script src='imagelist.js'></script>
   </head>
   <body>
-    <div>This test case has images hidden directly with an inline style of display:none. The images are loaded because DemandJS works by replacing the image with separate loading animation, which doesnt take that same inline style. The alternative approach that does work, is for the display:none to be placed on a parent or wrapper of the image, and in this way the loading animation would also respect the same style.</div><br/><br/>
     <script type="text/javascript">
       for (var i = 0; i < window.test_images.length; i++) {i
         var prop = '';
         if (i%2==0) { prop = 'style="display:none;" ' }
-        document.write('<div style="border:thin solid #000;"><img ' + prop + 'src="' + window.test_images[i] + '" /></div><br/>');
+        document.write('<div style="border:thin solid #000;"><div ' + prop + '><img src="' + window.test_images[i] + '" /></div></div><br/>');
       }
     </script>
     <script src="../demandjs.debug.js"></script>

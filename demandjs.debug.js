@@ -100,11 +100,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }, {
       key: 'beginLoad',
-      value: function beginLoad(registration) {
+      value: function beginLoad(target) {
         var _this = this;
 
-        if (registration.extraData.isLink && registration.extraData.hasHref) {
+        var _resolveTarget = this.resolveTarget(target),
+            target = _resolveTarget.target,
+            registration = _resolveTarget.registration;
+
+        if (registration.extraData.shouldInjectHtml) {
           var url = registration.extraData.href;
+          this.options.onLoadBegin(target);
           fetch(url).then(function (response) {
             if (!response.ok) {
               throw Error(response.status + '_' + response.statusText);
@@ -115,16 +120,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }).catch(function (ex) {
             _this.onLoadError(registration, ex);
           });
-        } else if (registration.extraData.hasSrc) {
-          registration.target.addEventListener('load', function (evt) {
-            return _this.onLoadComplete(registration);
-          });
-          registration.target.addEventListener('error', function (evt) {
-            return _this.onLoadError(registration, evt);
-          });
-          // setTimeout helps here helps keep loading animations smooth
+        } else if (registration.extraData.shouldRestore) {
+          // setTimeout helps keep loading animations smooth
           setTimeout(function () {
-            return registration.target.setAttribute('src', registration.extraData.src);
+            return _this.restoreTarget(registration);
           }, 0);
         } else {
           throw 'Unknown load operation';
@@ -138,13 +137,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectLink',
       value: function injectLink(target, txt) {
-        if (target.href.match(/\.html$/i)) {
-          var reg = this.phRegistry.get(target);
-          this.injectHtml(target, txt);
-          this.onLoadComplete(reg);
-        } else {
-          throw Error('Not implemented link injection with url ' + target.href);
-        }
+        var reg = this.phRegistry.get(target);
+        this.injectHtml(target, txt);
+        this.onLoadComplete(reg);
       }
     }, {
       key: 'injectScript',
@@ -241,7 +236,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }, {
       key: 'onLoadComplete',
-      value: function onLoadComplete(registration) {
+      value: function onLoadComplete(target) {
+        var _resolveTarget2 = this.resolveTarget(target),
+            target = _resolveTarget2.target,
+            registration = _resolveTarget2.registration;
+
         var first = this.options.shouldInsertOnLoad(registration.target);
         var _iteratorNormalCompletion6 = true;
         var _didIteratorError6 = false;
@@ -273,6 +272,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         this.cleanupRegistrationTarget(registration);
+        this.options.onLoadEnd(target);
+        this.options.onLoadComplete(target);
       }
     }, {
       key: 'cleanupPlaceholder',
@@ -286,10 +287,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       value: function cleanupRegistrationTarget(registration) {
         this.intersection.unobserve(registration.target); // this only necesarry when we didnt remove the item
         this.phRegistry.delete(registration.target);
+        this.loaded.set(registration.target, true);
       }
     }, {
       key: 'onLoadError',
-      value: function onLoadError(registration, evt) {
+      value: function onLoadError(target, evt) {
+        var _resolveTarget3 = this.resolveTarget(target),
+            target = _resolveTarget3.target,
+            registration = _resolveTarget3.registration;
+
         var first = true;
         var _iteratorNormalCompletion7 = true;
         var _didIteratorError7 = false;
@@ -345,46 +351,180 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         this.cleanupRegistrationTarget(registration);
+        this.options.onLoadError(target);
+        this.options.onLoadComplete(target);
       }
     }, {
       key: 'createErrorNode',
       value: function createErrorNode() {
         var ele = document.createElement('div');
-        ele.innerHTML = this.options.errorHTML;
+        ele.innerHTML = this.options.errorHtml;
         return Array.prototype.slice.call(ele.childNodes);
       }
     }, {
       key: 'createPlaceholder',
       value: function createPlaceholder() {
         var ele = document.createElement('div');
-        ele.innerHTML = this.options.pendingHTML;
+        ele.innerHTML = this.options.pendingHtml;
         return Array.prototype.slice.call(ele.childNodes);
       }
     }, {
       key: 'registerPlaceholder',
       value: function registerPlaceholder(node, target, placeholders, extraData) {
-        this.phRegistry.set(node, {
+        var result = {
+          isRegistration: true,
           target: target,
           node: node,
           placeholders: placeholders,
           extraData: extraData,
           loading: false
-        });
+        };
+        this.phRegistry.set(node, result);
+        return result;
+      }
+    }, {
+      key: 'resolveTarget',
+      value: function resolveTarget(target) {
+        var registration = target;
+        if (!('isRegistration' in target) || !target.isRegistration) {
+          registration = this.phRegistry.get(target);
+        } else {
+          target = registration.target;
+        }
+        return {
+          target: target,
+          registration: registration
+        };
+      }
+    }, {
+      key: 'restoreTarget',
+      value: function restoreTarget(target) {
+        var _resolveTarget4 = this.resolveTarget(target),
+            target = _resolveTarget4.target,
+            registration = _resolveTarget4.registration;
+
+        var extraData = registration.extraData;
+        registration.loading = true;
+        this.options.onLoadBegin(target);
+
+        this._restoreTargetInternal(target, extraData);
+
+        if (!extraData.canLoad) {
+          this.onLoadComplete(registration);
+        }
+      }
+    }, {
+      key: '_restoreTargetInternal',
+      value: function _restoreTargetInternal(target, extraData) {
+        if (extraData.hasSrcset) {
+          target.setAttribute('srcset', extraData.srcset);
+        }
+        if (extraData.hasSizes) {
+          target.setAttribute('sizes', extraData.sizes);
+        }
+        if (extraData.hasSrc) {
+          target.setAttribute('src', extraData.src);
+        }
+        if (extraData.children.length > 0) {
+          for (var i = 0; i < extraData.children.length; i++) {
+            var childData = extraData.children[i];
+            this._restoreTargetInternal(childData.target, childData);
+          }
+        }
+      }
+    }, {
+      key: 'captureTarget',
+      value: function captureTarget(target, targetRoot) {
+        var _this3 = this;
+
+        var store = {
+          'target': target,
+          'hasSrc': target.hasAttribute('src'),
+          'src': target.getAttribute('src'),
+          'hasSrcset': target.hasAttribute('srcset'),
+          'srcset': target.getAttribute('srcset'),
+          'hasSizes': target.hasAttribute('sizes'),
+          'sizes': target.getAttribute('sizes'),
+          'isLink': 'tagName' in target && target.tagName.match(/link/i),
+          'hasHref': target.hasAttribute('href'),
+          'href': target.getAttribute('href'),
+          'children': [],
+          'shouldRestore': false,
+          'canLoad': false,
+          'shouldInjectHtml': false
+        };
+        if (store.hasSrc) {
+          target.removeAttribute('src');
+        }
+        if (store.hasSrcset) {
+          target.removeAttribute('srcset');
+        }
+        if (store.hasSizes) {
+          target.removeAttribute('sizes');
+        }
+
+        if (store.isLink && store.hasHref) {
+          store.shouldInjectHtml = true;
+        }
+
+        // We do not care about load events of child elements
+        if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
+          store.shouldRestore = true;
+          store.canLoad = true;
+          target.addEventListener('load', function (evt) {
+            return _this3.onLoadComplete(targetRoot);
+          });
+          target.addEventListener('error', function (evt) {
+            return _this3.onLoadError(targetRoot, evt);
+          });
+        }
+
+        if ('tagName' in target && target.tagName.match(/picture|video|audio/i)) {
+          if (target === targetRoot) {
+            store.shouldRestore = true;
+          }
+          for (var i = 0; i < target.children.length; i++) {
+            var child = target.children[i];
+            var desc = this.captureTarget(child);
+            desc.index = i;
+            store.children.push(desc);
+          }
+        }
+
+        return store;
+      }
+    }, {
+      key: 'isContextExcluded',
+      value: function isContextExcluded(target) {
+        if (!target) {
+          return false;
+        }
+        if (!('parentNode' in target)) {
+          return false;
+        }
+        var parent = target.parentNode;
+        if (!parent) {
+          return false;
+        }
+        if (!('tagName' in parent)) {
+          return false;
+        }
+        if (parent.tagName.match(/picture|video|audio/i)) {
+          return true;
+        }
+
+        // need to recurse up for cases like video with embedded html as a fallback
+        return this.isContextExcluded(parent);
       }
     }, {
       key: 'observeTarget',
       value: function observeTarget(target) {
-        if (this.isLoaded(target)) {} else {
-          var store = {
-            'hasSrc': target.hasAttribute('src'),
-            'src': target.getAttribute('src'),
-            'isLink': 'tagName' in target && target.tagName.match(/link/i),
-            'hasHref': target.hasAttribute('href'),
-            'href': target.getAttribute('href')
-          };
-          if (store.hasSrc) {
-            target.removeAttribute('src');
-          }
+        if (this.isLoaded(target)) {
+          // do nothing, its already fully loaded
+        } else if (this.isContextExcluded(target)) {
+          // do nothing, another element should take care of it
+        } else {
+          var store = this.captureTarget(target, target);
           var placeholders = this.options.createPlaceholder(target);
           var _iteratorNormalCompletion9 = true;
           var _didIteratorError9 = false;
@@ -452,6 +592,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'isTargetMatch',
       value: function isTargetMatch(target) {
+        if (this.loaded.has(target)) {
+          return false;
+        }
         return 'matches' in target && target.matches(this.options.selector);
       }
     }, {
@@ -493,30 +636,37 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }]);
 
     function DemandJS(options) {
-      var _this3 = this;
+      var _this4 = this;
 
       _classCallCheck(this, DemandJS);
 
       this.phRegistry = new WeakMap();
+      this.loaded = new WeakMap();
       this.options = Object.assign({
-        pendingHTML: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        errorHTML: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
+        pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
+        errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
         createPlaceholder: function createPlaceholder(t) {
-          return _this3.createPlaceholder();
+          return _this4.createPlaceholder();
         },
         createErrorNode: function createErrorNode(t) {
-          return _this3.createErrorNode();
+          return _this4.createErrorNode();
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
         },
         shouldInsertOnLoad: function shouldInsertOnLoad(t) {
-          return _this3.options.shouldRemove(t);
+          return _this4.options.shouldRemove(t);
         },
-        selector: 'img,video,iframe,link.demand'
+        selector: 'img,video,picture,iframe,link.demand',
+        rootMargin: '48px',
+        threshold: 0,
+        onLoadBegin: function onLoadBegin(t) {},
+        onLoadEnd: function onLoadEnd(t) {},
+        onLoadError: function onLoadError(t) {},
+        onLoadComplete: function onLoadComplete(t) {}
       }, options);
       this.mutation = new MutationObserver(function (a, b) {
-        return _this3.observeMutation(a, b);
+        return _this4.observeMutation(a, b);
       });
       this.mutationOptions = {
         childList: true,
@@ -525,11 +675,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
       this.intersectionOptions = {
         root: null,
-        rootMargin: '48px',
-        threshold: 0
+        rootMargin: this.options.rootMargin,
+        threshold: this.options.threshold
       };
       this.intersection = new IntersectionObserver(function (a, b) {
-        return _this3.observeIntersection(a, b);
+        return _this4.observeIntersection(a, b);
       }, this.intersectionOptions);
 
       this.observeTargets(this.queryTargets());
