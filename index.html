@@ -1,0 +1,26 @@
+<html>
+  <head>
+    <script src="https://cdn.rawgit.com/showdownjs/showdown/1.8.4/dist/showdown.min.js" /></script>
+  </head>
+  <body>
+    <link rel="prefetch" class="demand" type="text/markdown" href="README.md" />
+    <script src="demandjs.debug.js"></script>
+    <script type="text/javascript">
+    var showdownConverter = new showdown.Converter();
+    showdownConverter.setFlavor('github');
+      var options = {
+        linkHandlers: {
+          'text/markdown': function (t,c) {
+            var html = showdownConverter.makeHtml(c);
+            var content = document.createElement('div');
+            content.innerHTML = html;
+            while (content.children.length > 0) {
+              t.parentNode.insertBefore(content.children[0], t);
+            }
+          }
+        }
+      };
+      window.DemandJSDemanded = new DemandJS(options);
+    </script>
+  </body>
+</html>

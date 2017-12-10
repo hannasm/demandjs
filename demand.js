@@ -21,7 +21,7 @@
     }
     beginLoad(target) {
       var {target, registration} = this.resolveTarget(target);
-      if (registration.extraData.shouldInjectHtml) {
+      if (registration.extraData.shouldInjectLink) {
         let url = registration.extraData.href;
         this.options.onLoadBegin(target);
         fetch(url).then(function (response) {
@@ -30,7 +30,7 @@
           }
           return response.text();
         }).then(txt=>{
-          this.injectLink(registration.target, txt);
+          this.injectLink(registration, txt);
         }).catch(ex=>{
           this.onLoadError(registration, ex);
         });
@@ -45,9 +45,15 @@
       return target.complete || false;
     }
     injectLink(target, txt) {
-      let reg = this.phRegistry.get(target);
-      this.injectHtml(target, txt);
-      this.onLoadComplete(reg);
+      var {target, registration} = this.resolveTarget(target);
+      var type = registration.extraData.type;
+      if (type in this.options.linkHandler) {
+        var handler = this.options.linkHandler[type];
+        handler(target, txt);
+      } else {
+        throw 'Unknown link demand with content type: ' + type;
+      }
+      this.onLoadComplete(registration);
     }
     injectScript(target, id, code) {
       var oldDw = document.write;
@@ -208,10 +214,12 @@
         'isLink': ('tagName' in target) && (target.tagName.match(/link/i)),
         'hasHref': target.hasAttribute('href'),
         'href': target.getAttribute('href'),
+        'hasType': target.hasAttribute('type'),
+        'type': target.getAttribute('type'),
         'children': [],
         'shouldRestore': false,
         'canLoad': false,
-        'shouldInjectHtml': false
+        'shouldInjectLink': false
       };
       if (store.hasSrc) {
         target.removeAttribute('src');
@@ -224,7 +232,10 @@
       }
 
       if (store.isLink && store.hasHref) {
-        store.shouldInjectHtml = true;
+        store.shouldInjectLink = true;
+        if (!store.hasType) {
+          store.type = 'text/html';
+        }
       }
 
 
@@ -304,6 +315,12 @@
     constructor(options) {
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
+
+      let newHandlers = {};
+      if (options && 'linkHandler' in options) {
+        newHandlers = options.linkHandler;
+        delete options.linkHandler;
+      }
       this.options = Object.assign({
         pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
         errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
@@ -317,8 +334,14 @@
         onLoadBegin: t=>{},
         onLoadEnd: t=>{},
         onLoadError: t=>{},
-        onLoadComplete: t=>{}
+        onLoadComplete: t=>{},
+        linkHandler: {
+          'text/html': (t,c)=>this.injectHtml(t,c),
+          'application/xhtml+xml': (t,c)=>this.injectHtml(t,c)
+        }
       }, options);
+      this.options.linkHandler = Object.assign(this.options.linkHandler, newHandlers);
+
       this.mutation = new MutationObserver((a,b)=>this.observeMutation(a,b));
       this.mutationOptions = {
         childList: true,

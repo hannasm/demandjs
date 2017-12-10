@@ -107,7 +107,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             target = _resolveTarget.target,
             registration = _resolveTarget.registration;
 
-        if (registration.extraData.shouldInjectHtml) {
+        if (registration.extraData.shouldInjectLink) {
           var url = registration.extraData.href;
           this.options.onLoadBegin(target);
           fetch(url).then(function (response) {
@@ -116,7 +116,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             }
             return response.text();
           }).then(function (txt) {
-            _this.injectLink(registration.target, txt);
+            _this.injectLink(registration, txt);
           }).catch(function (ex) {
             _this.onLoadError(registration, ex);
           });
@@ -137,9 +137,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectLink',
       value: function injectLink(target, txt) {
-        var reg = this.phRegistry.get(target);
-        this.injectHtml(target, txt);
-        this.onLoadComplete(reg);
+        var _resolveTarget2 = this.resolveTarget(target),
+            target = _resolveTarget2.target,
+            registration = _resolveTarget2.registration;
+
+        var type = registration.extraData.type;
+        if (type in this.options.linkHandlers) {
+          var handler = this.options.linkHandlers[type];
+          handler(target, txt);
+        } else {
+          throw 'Unknown link demand with content type: ' + type;
+        }
+        this.onLoadComplete(registration);
       }
     }, {
       key: 'injectScript',
@@ -237,9 +246,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'onLoadComplete',
       value: function onLoadComplete(target) {
-        var _resolveTarget2 = this.resolveTarget(target),
-            target = _resolveTarget2.target,
-            registration = _resolveTarget2.registration;
+        var _resolveTarget3 = this.resolveTarget(target),
+            target = _resolveTarget3.target,
+            registration = _resolveTarget3.registration;
 
         var first = this.options.shouldInsertOnLoad(registration.target);
         var _iteratorNormalCompletion6 = true;
@@ -292,9 +301,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'onLoadError',
       value: function onLoadError(target, evt) {
-        var _resolveTarget3 = this.resolveTarget(target),
-            target = _resolveTarget3.target,
-            registration = _resolveTarget3.registration;
+        var _resolveTarget4 = this.resolveTarget(target),
+            target = _resolveTarget4.target,
+            registration = _resolveTarget4.registration;
 
         var first = true;
         var _iteratorNormalCompletion7 = true;
@@ -399,9 +408,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'restoreTarget',
       value: function restoreTarget(target) {
-        var _resolveTarget4 = this.resolveTarget(target),
-            target = _resolveTarget4.target,
-            registration = _resolveTarget4.registration;
+        var _resolveTarget5 = this.resolveTarget(target),
+            target = _resolveTarget5.target,
+            registration = _resolveTarget5.registration;
 
         var extraData = registration.extraData;
         registration.loading = true;
@@ -448,10 +457,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           'isLink': 'tagName' in target && target.tagName.match(/link/i),
           'hasHref': target.hasAttribute('href'),
           'href': target.getAttribute('href'),
+          'hasType': target.hasAttribute('type'),
+          'type': target.getAttribute('type'),
           'children': [],
           'shouldRestore': false,
           'canLoad': false,
-          'shouldInjectHtml': false
+          'shouldInjectLink': false
         };
         if (store.hasSrc) {
           target.removeAttribute('src');
@@ -464,7 +475,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         if (store.isLink && store.hasHref) {
-          store.shouldInjectHtml = true;
+          store.shouldInjectLink = true;
+          if (!store.hasType) {
+            store.type = 'text/html';
+          }
         }
 
         // We do not care about load events of child elements
@@ -642,6 +656,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
+
+      var newHandlers = {};
+      if (options && 'linkHandlers' in options) {
+        newHandlers = options.linkHandlers;
+        delete options.linkHandlers;
+      }
       this.options = Object.assign({
         pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
         errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
@@ -663,8 +683,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         onLoadBegin: function onLoadBegin(t) {},
         onLoadEnd: function onLoadEnd(t) {},
         onLoadError: function onLoadError(t) {},
-        onLoadComplete: function onLoadComplete(t) {}
+        onLoadComplete: function onLoadComplete(t) {},
+        linkHandlers: {
+          'text/html': function textHtml(t, c) {
+            return _this4.injectHtml(t, c);
+          },
+          'application/xhtml+xml': function applicationXhtmlXml(t, c) {
+            return _this4.injectHtml(t, c);
+          }
+        }
       }, options);
+      this.options.linkHandlers = Object.assign(this.options.linkHandlers, newHandlers);
+
       this.mutation = new MutationObserver(function (a, b) {
         return _this4.observeMutation(a, b);
       });
