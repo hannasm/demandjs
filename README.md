@@ -3,7 +3,7 @@
 
 ## Version
 
-0.0.3 - this is still a pre-release / in development version but it is fairly functional, if you're brave enough
+0.0.4 - this is still a pre-release / in development version but it is fairly functional, if you're brave enough
 
 ## Overview
 
@@ -68,7 +68,7 @@ DemandJS comes with a single built-in link handler that accepts both `text/html`
 <link rel="prefetch" class="demand" href="externalPage2.html" type="application/xhtml+xml" />
 ```
 
-DemandJS will lazy load both externalPage1.html and externalPage2.html as they are scrolled into the viewport by the user. These link elements are by default not displayed to the user, and so will not be removed from the DOM (which is different from how img elements are handled). A loading indicator is inserted into the DOM immediately adjacent to the link element, and adheres to the rules of the `createPlaceholder` and other loading indicator options.
+DemandJS will lazy load both externalPage1.html and externalPage2.html as they are scrolled into the viewport by the user. These link elements are by default not displayed to the user, and so will not be removed from the DOM (which is different from how img elements are handled). A loading indicator is inserted into the DOM immediately adjacent to the link element, and adheres to the rules of the `createLoadingNode` and other loading indicator options.
 
  * Using `rel="prefetch"` is optional but queues the browser that the content specified in the href may be requested and the browser can preemptively load it if it has extra cycles. There are numerous other standardized values for the `rel` attribute that may be applicable depending on your situation.
  * Using `class="demand"` is a convention of the default DemandJS options and completely different selectors and/or classnames could be used if desired.
@@ -103,23 +103,90 @@ A couple of points to notice about this code:
 
 Reference: https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types
 
+## Error Handling
+Errors during resource loading are reported and handled by default through the ```failureHtml``` property by removing the content
+that failed to load, and replacing it with a html element with a bright red background and white text ```ERROR```. This
+content can be configured by setting the ```failureHtml``` property on the options.
 
+A simple customization is shown below:
+ ([see test009](test/test009.html))
+
+```javascript
+var options = {
+  failureHtml: "<div class='errorMessage'>Loading Failed!</div>"
+};
+window.DemandJSDemanded = new DemandJS(options);
+```
+
+Errors can can be captured and handled by passing a custom function as ```createFailureNode``` in the options object. This function is expected to return a collection of one or more html element objects to be inserted (but not yet inserted) into the document. These elements will be inserted at the place where the failed content was located. This function will be invoked with this set to the DemandJS object and using this.createFailureNode() will fallback to the default implementation.
+
+A simple customization is shown below:
+ ([see test010](test/test010.html))
+
+```javascript
+var options = {
+  createFailureNode: function(target,error) {
+    if (target.classList.contains('showErrorMessage')) {
+      var result = document.createElement('div');
+      result.innerHTML = '<div class="errorMessage">Loading failed with error: </div>';
+      result.children[0].appendChild(document.createTextNode(error.message));
+      return result.children;
+    } else {
+      return this.createFailureNode();
+    }
+  }
+};
+window.DemandJSDemanded = new DemandJS(options);
+```
+
+Errors can also be captured and handled by passing a custom function as ```onLoadError``` in the options object. This function is expected to do any dom modifications directly as needed. This is the most robust way of configuring error handling, but also comes with the greatest responsibility. Be sure to remove the target node (if you don't want it to be shown in the page).
+
+The default implementation is shown below (whic is written using ES6 code:
+
+```javascript
+var options = {
+	onLoadFailure: function(target, ex){                                                                                                        
+		var errorUI = this.options.createFailureNode.call(this, target, ex);
+		errorUI = Array.prototype.slice.call(errorUI);
+		for (var eui of errorUI) {
+			target.parentNode.insertBefore(eui, target);
+		}
+		if (this.options.shouldRemove(target)) {
+			target.parentNode.removeChild(target);
+		}
+	}
+};
+window.DemandJSDemanded = new DemandJS(options);
+```
+
+a simple overload that displays an alert box when each error occurrs (but also performs the built-in functionality) might look as follows:
+ ([see test011](test/test011.html))
+
+```javascript
+var options = {
+	onLoadFailure: function(target, ex){                                                                                                        
+    alert(ex.message);
+    this.onLoadFailure(target, ex);
+  }
+};
+window.DemandJSDemanded = new DemandJS(options);
+```
 ## Configuration
 
   The DemandJS constructor accepts a single argument, which is the options collection. 
 
   | Field                  | Description | Default |
   |------------------------|-------------|---------|
-  | pendingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` |
-  | createPlaceholder      | This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the pendingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `pendingHtml` specified |
-  | errorHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` |
-  | createErrorNodeo     | This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a non-standard (and possibly undefined) error detail, which could possibly be an exception, a generic message, or again undefined. In case the errorHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defines a functor to creating the `errorHtml` |
+  | loadingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` |
+  | createLoadingNode      | This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified |
+  | failureHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` |
+  | createFailureNode     | This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a non-standard (and possibly undefined) error detail, which could possibly be an exception, a generic message, or again undefined. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defines a functor to creating the `failureHtml` |
   | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. | `img,video,picture,iframe,link.demand` |
   | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `48px` |
   | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the placeholder element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` |
   | onLoadBegin            | `function(target) {}` - this is called each time an element begins loading, the element is passed as an argument  | noop |
-  | onLoadEnd              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop |
-  | onLoadError              | `function(target) {}` - this is called each time loading fails with error, the element is passed as an argument  | noop |
+  | onLoadSuccess              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop |
+  | onLoadFailure              | `function(target, exception) {}` - this is called each time loading fails with error, the element that was loading is passed as the argument 'target'. 'exception' details which will be of type Error.  | noop |
   | onLoadComplete              | `function(target) {}` - this is called each time loading completes, both for error and success, the element is passed as an argument  | noop |
   | linkHandler                 | this is a collection of (key,value) pairs where key is a mime-type (string) and value is a function (target, content) to be invoked when a link element with `type="(contentType)"` is loaded | handlers for mime types `text/html` and `application/xhtml+xml` are available by default |
 
@@ -128,12 +195,12 @@ Reference: https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types
 You will need to polyfill any essential components if you want to use this library. There are some additional optional
 polyfills that are only required for specific features.
 
-WeakMap - essential
-IntersectionObserver  - essential
-MutationObserver - essential
-HTMLElement.matches - essential (IE8/IE9 only?)
-fetch - currently only required when fetching links
-promise - currently only required when fetchign links
+* WeakMap - essential
+* IntersectionObserver  - essential
+* MutationObserver - essential
+* HTMLElement.matches - essential (IE8/IE9 only?)
+* fetch - currently only required when fetching links
+* promise - currently only required when fetchign links
 
 
 ## Build Dependencies
@@ -160,16 +227,23 @@ Additional test cases are welcome, and without assertions, it should be pretty e
 It should be fairly easy to make assertions using some combination of properties like img.complete / video.buffered and window.scrollTo  for some test cases. The Resource Timing API (https://www.w3.org/TR/resource-timing/) or whatever comes of this proposed technology might also be a resonable choice for implementing assertions in the future, but compatibility would be very limited without polyfills in the short term.
 
 ### Test Index
-  [test001](test/test001.html)
-  [test002](test/test002.html)
-  [test003](test/test003.html)
-  [test004](test/test004.html)
-  [test005](test/test005.html)
-  [test006](test/test006.html)
-  [test007](test/test007.html)
+ * [test001](test/test001.html)
+ * [test002](test/test002.html)
+ * [test003](test/test003.html)
+ * [test003_error](test/test003_error.html)
+ * [test004](test/test004.html)
+ * [test005](test/test005.html)
+ * [test005_error](test/test005_error.html)
+ * [test006](test/test006.html)
+ * [test007](test/test007.html)
+ * [test008](test/test008.html)
+ * [test009](test/test009.html)
+ * [test010](test/test010.html)
+ * [test011](test/test011.html)
 
 ## Release Notes 
 
+* 0.0.4 - error handling fleshed out and tested
 * 0.0.3 - added 'linkHandler' option and more documentation improvements
 * 0.0.2 - added support for srcset attribute, picture elements, and more advanced usages of video (audio) that embed source elements as opposed to using direct src fields
 * 0.0.2 - add support for picture elementsmedia

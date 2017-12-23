@@ -4,6 +4,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+/** @preserve DemandJS - v.0.0.4 */
 (function (ctx) {
   var DemandJS = function () {
     _createClass(DemandJS, [{
@@ -112,13 +113,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           this.options.onLoadBegin(target);
           fetch(url).then(function (response) {
             if (!response.ok) {
-              throw Error(response.status + '_' + response.statusText);
+              var error = new Error('Fetching "' + url + '" failed with ' + response.status + ' ' + response.statusText);
+              error.responseDetail = response;
+              throw error;
             }
             return response.text();
           }).then(function (txt) {
             _this.injectLink(registration, txt);
           }).catch(function (ex) {
-            _this.onLoadError(registration, ex);
+            _this.handleError(registration, ex);
           });
         } else if (registration.extraData.shouldRestore) {
           // setTimeout helps keep loading animations smooth
@@ -142,13 +145,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             registration = _resolveTarget2.registration;
 
         var type = registration.extraData.type;
-        if (type in this.options.linkHandlers) {
-          var handler = this.options.linkHandlers[type];
+        if (type in this.options.linkHandler) {
+          var handler = this.options.linkHandler[type];
           handler(target, txt);
         } else {
           throw 'Unknown link demand with content type: ' + type;
         }
-        this.onLoadComplete(registration);
+        this.processSuccess(registration);
       }
     }, {
       key: 'injectScript',
@@ -244,8 +247,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
-      key: 'onLoadComplete',
-      value: function onLoadComplete(target) {
+      key: 'processSuccess',
+      value: function processSuccess(target) {
         var _resolveTarget3 = this.resolveTarget(target),
             target = _resolveTarget3.target,
             registration = _resolveTarget3.registration;
@@ -281,8 +284,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         this.cleanupRegistrationTarget(registration);
-        this.options.onLoadEnd(target);
-        this.options.onLoadComplete(target);
+        this.options.onLoadSuccess.call(this, target);
+        this.options.onLoadComplete.call(this, target);
+      }
+    }, {
+      key: 'onLoadSuccess',
+      value: function onLoadSuccess(target) {
+        //  nothing to do here
       }
     }, {
       key: 'cleanupPlaceholder',
@@ -299,12 +307,19 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.loaded.set(registration.target, true);
       }
     }, {
-      key: 'onLoadError',
-      value: function onLoadError(target, evt) {
+      key: 'handleError',
+      value: function handleError(target, ex) {
         var _resolveTarget4 = this.resolveTarget(target),
             target = _resolveTarget4.target,
             registration = _resolveTarget4.registration;
 
+        if (!(ex && ex.stack && ex.message)) {
+          if (!ex) {
+            ex = new Error("No error was provided on load");
+          } else {
+            ex = new Error(ex);
+          }
+        }
         var first = true;
         var _iteratorNormalCompletion7 = true;
         var _didIteratorError7 = false;
@@ -316,31 +331,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
             if (first) {
               first = false;
-              var errorUI = this.options.createErrorNode(registration.target);
-              var _iteratorNormalCompletion8 = true;
-              var _didIteratorError8 = false;
-              var _iteratorError8 = undefined;
 
-              try {
-                for (var _iterator8 = errorUI[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
-                  var eui = _step8.value;
-
-                  placeholder.parentNode.insertBefore(eui, placeholder);
-                }
-              } catch (err) {
-                _didIteratorError8 = true;
-                _iteratorError8 = err;
-              } finally {
-                try {
-                  if (!_iteratorNormalCompletion8 && _iterator8.return) {
-                    _iterator8.return();
-                  }
-                } finally {
-                  if (_didIteratorError8) {
-                    throw _iteratorError8;
-                  }
-                }
+              if (!target.parentNode) {
+                placeholder.parentNode.insertBefore(target, placeholder);
               }
+
+              this.options.onLoadFailure.call(this, target, ex);
             }
             this.cleanupPlaceholder(placeholder);
           }
@@ -359,23 +355,60 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }
         }
 
+        if (first) {
+          this.options.onLoadFailure.call(this, target, ex);
+        }
+
         this.cleanupRegistrationTarget(registration);
-        this.options.onLoadError(target);
-        this.options.onLoadComplete(target);
+        this.options.onLoadComplete.call(this, target);
       }
     }, {
-      key: 'createErrorNode',
-      value: function createErrorNode() {
-        var ele = document.createElement('div');
-        ele.innerHTML = this.options.errorHtml;
-        return Array.prototype.slice.call(ele.childNodes);
+      key: 'onLoadFailure',
+      value: function onLoadFailure(target, ex) {
+        var errorUI = this.options.createFailureNode.call(this, target, ex);
+        errorUI = Array.prototype.slice.call(errorUI);
+        var _iteratorNormalCompletion8 = true;
+        var _didIteratorError8 = false;
+        var _iteratorError8 = undefined;
+
+        try {
+          for (var _iterator8 = errorUI[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
+            var eui = _step8.value;
+
+            target.parentNode.insertBefore(eui, target);
+          }
+        } catch (err) {
+          _didIteratorError8 = true;
+          _iteratorError8 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion8 && _iterator8.return) {
+              _iterator8.return();
+            }
+          } finally {
+            if (_didIteratorError8) {
+              throw _iteratorError8;
+            }
+          }
+        }
+
+        if (this.options.shouldRemove(target)) {
+          target.parentNode.removeChild(target);
+        }
       }
     }, {
-      key: 'createPlaceholder',
-      value: function createPlaceholder() {
+      key: 'createFailureNode',
+      value: function createFailureNode() {
         var ele = document.createElement('div');
-        ele.innerHTML = this.options.pendingHtml;
-        return Array.prototype.slice.call(ele.childNodes);
+        ele.innerHTML = this.options.failureHtml;
+        return ele.childNodes;
+      }
+    }, {
+      key: 'createLoadingNode',
+      value: function createLoadingNode() {
+        var ele = document.createElement('div');
+        ele.innerHTML = this.options.loadingHtml;
+        return ele.childNodes;
       }
     }, {
       key: 'registerPlaceholder',
@@ -419,7 +452,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this._restoreTargetInternal(target, extraData);
 
         if (!extraData.canLoad) {
-          this.onLoadComplete(registration);
+          this.processSuccess(registration);
         }
       }
     }, {
@@ -486,11 +519,26 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           store.shouldRestore = true;
           store.canLoad = true;
           target.addEventListener('load', function (evt) {
-            return _this3.onLoadComplete(targetRoot);
+            return _this3.processSuccess(targetRoot);
           });
-          target.addEventListener('error', function (evt) {
-            return _this3.onLoadError(targetRoot, evt);
-          });
+
+          if (store.hasSrcset && store.hasSrc) {
+            target.addEventListener('error', function (evt) {
+              _this3.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'));
+            });
+          } else if (store.hasSrcset) {
+            target.addEventListener('error', function (evt) {
+              _this3.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'));
+            });
+          } else if (store.hasSrc) {
+            target.addEventListener('error', function (evt) {
+              _this3.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'));
+            });
+          } else {
+            target.addEventListener('error', function (evt) {
+              _this3.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'));
+            });
+          }
         }
 
         if ('tagName' in target && target.tagName.match(/picture|video|audio/i)) {
@@ -539,7 +587,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           // do nothing, another element should take care of it
         } else {
           var store = this.captureTarget(target, target);
-          var placeholders = this.options.createPlaceholder(target);
+          var placeholders = this.options.createLoadingNode.call(this, target);
+          placeholders = Array.prototype.slice.call(placeholders);
           var _iteratorNormalCompletion9 = true;
           var _didIteratorError9 = false;
           var _iteratorError9 = undefined;
@@ -658,18 +707,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.loaded = new WeakMap();
 
       var newHandlers = {};
-      if (options && 'linkHandlers' in options) {
-        newHandlers = options.linkHandlers;
-        delete options.linkHandlers;
+      if (options && 'linkHandler' in options) {
+        newHandlers = options.linkHandler;
+        delete options.linkHandler;
       }
       this.options = Object.assign({
-        pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
-        createPlaceholder: function createPlaceholder(t) {
-          return _this4.createPlaceholder();
+        loadingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
+        failureHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
+        createLoadingNode: function createLoadingNode(t) {
+          return _this4.createLoadingNode();
         },
-        createErrorNode: function createErrorNode(t) {
-          return _this4.createErrorNode();
+        createFailureNode: function createFailureNode(t, ex) {
+          return _this4.createFailureNode();
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
@@ -681,10 +730,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         rootMargin: '48px',
         threshold: 0,
         onLoadBegin: function onLoadBegin(t) {},
-        onLoadEnd: function onLoadEnd(t) {},
-        onLoadError: function onLoadError(t) {},
+        onLoadSuccess: function onLoadSuccess(t) {
+          return _this4.onLoadSuccess(t);
+        },
+        onLoadFailure: function onLoadFailure(t, e) {
+          return _this4.onLoadFailure(t, e);
+        },
         onLoadComplete: function onLoadComplete(t) {},
-        linkHandlers: {
+        linkHandler: {
           'text/html': function textHtml(t, c) {
             return _this4.injectHtml(t, c);
           },
@@ -693,7 +746,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }
         }
       }, options);
-      this.options.linkHandlers = Object.assign(this.options.linkHandlers, newHandlers);
+      this.options.linkHandler = Object.assign(this.options.linkHandler, newHandlers);
 
       this.mutation = new MutationObserver(function (a, b) {
         return _this4.observeMutation(a, b);
@@ -721,5 +774,27 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
   window.DemandJS = DemandJS;
 })(window);
+/** @license MIT License
+
+Copyright (c) 2017 Sean Hanna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
 
 //# sourceMappingURL=demandjs.debug.js.map

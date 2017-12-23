@@ -9,7 +9,7 @@
     var showdownConverter = new showdown.Converter();
     showdownConverter.setFlavor('github');
       var options = {
-        linkHandlers: {
+        linkHandler: {
           'text/markdown': function (t,c) {
             var html = showdownConverter.makeHtml(c);
             var content = document.createElement('div');

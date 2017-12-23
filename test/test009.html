@@ -1,0 +1,32 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {i
+        var arr = window.test_images;
+        if (i%2==1) {
+          arr = window.error_images;
+        }
+        document.write('<img src="' + arr[i] + '" /><br/>');
+      }
+    </script>
+    <style type='text/css'>
+    .errorMessage {
+      background-color: #F00;
+      color:#FFF;
+      width:100%;
+    }
+    </style>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+			var options = {
+				failureHtml: "<div class='errorMessage'>Loading Failed!</div>"
+			};
+
+      var djs = new DemandJS(options);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {i
+        var arr = window.test_images;
+        if (i%2==1) {
+          arr = window.error_images;
+        }
+        document.write('<img src="' + arr[i] + '" /><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var djs = new DemandJS();
+    </script>
+  </body>
+</html>

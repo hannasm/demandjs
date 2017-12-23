@@ -1,3 +1,4 @@
+/** @preserve DemandJS - v.0.0.4 */
 (function (ctx) {
   class DemandJS {
     observeMutation(mutations) {
@@ -26,13 +27,15 @@
         this.options.onLoadBegin(target);
         fetch(url).then(function (response) {
           if (!response.ok) {
-            throw Error(response.status + '_' + response.statusText);
+            var error = new Error('Fetching "' + url + '" failed with ' + response.status + ' ' + response.statusText);
+            error.responseDetail = response;
+            throw error;
           }
           return response.text();
         }).then(txt=>{
           this.injectLink(registration, txt);
         }).catch(ex=>{
-          this.onLoadError(registration, ex);
+          this.handleError(registration, ex);
         });
       } else if (registration.extraData.shouldRestore) {
         // setTimeout helps keep loading animations smooth
@@ -53,7 +56,7 @@
       } else {
         throw 'Unknown link demand with content type: ' + type;
       }
-      this.onLoadComplete(registration);
+      this.processSuccess(registration);
     }
     injectScript(target, id, code) {
       var oldDw = document.write;
@@ -97,7 +100,7 @@
         }
       }
     }
-    onLoadComplete(target) {
+    processSuccess(target) {
       var {target, registration} = this.resolveTarget(target);
       let first = this.options.shouldInsertOnLoad(registration.target);
       for (var placeholder of registration.placeholders) {
@@ -108,8 +111,11 @@
         this.cleanupPlaceholder(placeholder);
       }
       this.cleanupRegistrationTarget(registration);
-      this.options.onLoadEnd(target);
-      this.options.onLoadComplete(target);
+      this.options.onLoadSuccess.call(this, target);
+      this.options.onLoadComplete.call(this, target);
+    }
+    onLoadSuccess(target) {
+      //  nothing to do here
     }
     cleanupPlaceholder(placeholder) {
         this.intersection.unobserve(placeholder);
@@ -121,33 +127,55 @@
       this.phRegistry.delete(registration.target);
       this.loaded.set(registration.target, true);
     }
-    onLoadError(target, evt) {
+    handleError(target, ex) {
       var {target, registration} = this.resolveTarget(target);
+      if (!(ex && ex.stack && ex.message))  {
+        if (!ex) {
+          ex = new Error("No error was provided on load");
+        } else {
+          ex = new Error(ex);
+        }
+      }
       let first = true;
       for (var placeholder of registration.placeholders) {
         if (first) {
           first = false;
-          var errorUI = this.options.createErrorNode(registration.target);
-          for (var eui of errorUI) {
-            placeholder.parentNode.insertBefore(eui, placeholder);
+          
+          if (!target.parentNode) {
+            placeholder.parentNode.insertBefore(target, placeholder);
           }
+
+          this.options.onLoadFailure.call(this, target, ex);
         }
         this.cleanupPlaceholder(placeholder);
       }
+      if (first) {
+        this.options.onLoadFailure.call(this, target, ex);
+      }
 
       this.cleanupRegistrationTarget(registration);
-      this.options.onLoadError(target);
-      this.options.onLoadComplete(target);
+      this.options.onLoadComplete.call(this, target);
     }
-    createErrorNode() {
-      var ele = document.createElement('div');
-      ele.innerHTML = this.options.errorHtml;
-      return Array.prototype.slice.call(ele.childNodes);
+    onLoadFailure(target, ex) {
+        var errorUI = this.options.createFailureNode.call(this, target, ex);
+        errorUI = Array.prototype.slice.call(errorUI);
+        for (var eui of errorUI) {
+          target.parentNode.insertBefore(eui, target);
+        }
+        if (this.options.shouldRemove(target)) {
+          target.parentNode.removeChild(target);
+        }
     }
-    createPlaceholder() {
+    
+    createFailureNode() {
       var ele = document.createElement('div');
-      ele.innerHTML = this.options.pendingHtml;
-      return Array.prototype.slice.call(ele.childNodes);
+      ele.innerHTML = this.options.failureHtml;
+      return ele.childNodes;
+    }
+    createLoadingNode() {
+      var ele = document.createElement('div');
+      ele.innerHTML = this.options.loadingHtml;
+      return ele.childNodes;
     }
     registerPlaceholder(node, target, placeholders, extraData) {
       var result = {
@@ -182,7 +210,7 @@
       this._restoreTargetInternal(target, extraData);
 
       if (!extraData.canLoad) {
-        this.onLoadComplete(registration);
+        this.processSuccess(registration);
       }
     }
     _restoreTargetInternal(target, extraData) {
@@ -243,8 +271,25 @@
       if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
         store.shouldRestore = true;
         store.canLoad = true;
-        target.addEventListener('load', evt=>this.onLoadComplete(targetRoot));
-        target.addEventListener('error', evt=>this.onLoadError(targetRoot, evt));
+        target.addEventListener('load', evt=>this.processSuccess(targetRoot));
+
+        if (store.hasSrcset && store.hasSrc) {
+          target.addEventListener('error', evt=>{
+            this.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'))
+          });
+        } else if (store.hasSrcset) {
+          target.addEventListener('error', evt=>{
+            this.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'))
+          });
+        } else if (store.hasSrc) {
+          target.addEventListener('error', evt=>{
+            this.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'))
+          });
+        } else {
+          target.addEventListener('error', evt=>{
+            this.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'))
+          });
+        }
       }
 
       if ('tagName' in target && target.tagName.match(/picture|video|audio/i)) {
@@ -279,7 +324,8 @@
         // do nothing, another element should take care of it
       } else {
         var store = this.captureTarget(target, target);
-        var placeholders = this.options.createPlaceholder(target);
+        var placeholders = this.options.createLoadingNode.call(this, target);
+        placeholders = Array.prototype.slice.call(placeholders);
         for (var placeholder of placeholders) {
           this.registerPlaceholder(placeholder, target, placeholders, store);
           target.parentNode.insertBefore(placeholder, target);
@@ -322,18 +368,18 @@
         delete options.linkHandler;
       }
       this.options = Object.assign({
-        pendingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        errorHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
-        createPlaceholder: t=>this.createPlaceholder(),
-        createErrorNode: t=>this.createErrorNode(),
+        loadingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
+        failureHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
+        createLoadingNode: t=>this.createLoadingNode(),
+        createFailureNode: (t,ex)=>this.createFailureNode(),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
         selector: 'img,video,picture,iframe,link.demand',
         rootMargin: '48px',
         threshold: 0,
         onLoadBegin: t=>{},
-        onLoadEnd: t=>{},
-        onLoadError: t=>{},
+        onLoadSuccess: t=>this.onLoadSuccess(t),
+        onLoadFailure: (t,e)=>this.onLoadFailure(t,e),
         onLoadComplete: t=>{},
         linkHandler: {
           'text/html': (t,c)=>this.injectHtml(t,c),
@@ -362,3 +408,25 @@
 
   window.DemandJS = DemandJS;
 })(window);
+/** @license MIT License
+
+Copyright (c) 2017 Sean Hanna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
