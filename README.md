@@ -3,13 +3,19 @@
 
 ## Version
 
-0.0.4 - this is still a pre-release / in development version but it is fairly functional, if you're brave enough
+1.0.0-rc.1 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
 DemandJS provides lazy loading of resources as they scroll into view using true progressive enhancement and the latest browser features. DemandJS works with most elements using a src attribute including images, videos, and there is extra support for embedding external content of all types, and especially html files. DemandJS uses the latest (2017) of modern browser features and aims to be as efficient and lightweight as possible. For older browser compatibility, you can polyfill features to reach your target audience.
 
 Loading resources on demand can drastically reduce initial page load times and perceived page performance.
+
+## Best Practices
+
+* It is important that your loading elements are approximately the same dimensions as your actual content. DemandJS replaces your actual content with loading elements (e.g. loading anmiation). When the loading element becomes visible on the page, demandjs will begin loading your actual content. If the loading element is significantly smaller than the actual content, and several are clumped together in the layout, loading may start earlier than was actually needed. If your loading elements are significantly larger than your actual content, and several are clumped together, inserting your actual content into the page may lead to other loading elements popping into view, and hence additional loads happening later than intended.
+
+* In the default configuration, demandjs will ignore any elements with the 'nodemand' class. You may also use the ```ignoreSelector``` option to customize which elements are ignored. ([see test020](test/test020.html))
 
 ## Usage
 
@@ -132,7 +138,7 @@ var options = {
       result.children[0].appendChild(document.createTextNode(error.message));
       return result.children;
     } else {
-      return this.createFailureNode();
+      return this.createFailureNode(target, error);
     }
   }
 };
@@ -171,19 +177,64 @@ var options = {
 };
 window.DemandJSDemanded = new DemandJS(options);
 ```
+
+## Demand Classes ##
+Demand classes enable different content to be configured in different ways without using multiple instances of DemandJS. The most common usage is to display different loading or error animations for different content.
+
+
+The default attribute used for a demand class is ```data-demand``` (this can be configured with the ```demandClassAttribute``` option). When a demand class is not specified a default of ```default``` is used instead (this  can be configured with the ```defaultDemandClass``` option).
+
+```html
+  <img id='image1' src='test.jpg' /> <!-- standard -->
+  <img id='image2' src='test.jpg' data-demand='spinner' /> <!-- demand class set to spinner -->
+  <img id='image3' src='test.jpg' data-demand='progress' /> <!-- demand class set to progress -->
+  <img id='image4' src='test.jpg' data-demand='hideError' /> <!-- demand class set to hideError -->
+```
+
+Once this is configured, each demand class can have different configuration given across any or all of the compatible DemandJS options.
+
+```javascript
+var options = {
+  loadingHtml: {
+    'default': '<div style="width:100%;height:100%">Loading In Progress</div>',
+    'spinner': '<img src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />',
+    'progress': '<img src="data:image/gif;base64,R0lGODlhEAALAPQAAP///wAAANra2tDQ0Orq6gYGBgAAAC4uLoKCgmBgYLq6uiIiIkpKSoqKimRkZL6+viYmJgQEBE5OTubm5tjY2PT09Dg4ONzc3PLy8ra2tqCgoMrKyu7u7gAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCwAAACwAAAAAEAALAAAFLSAgjmRpnqSgCuLKAq5AEIM4zDVw03ve27ifDgfkEYe04kDIDC5zrtYKRa2WQgAh+QQJCwAAACwAAAAAEAALAAAFJGBhGAVgnqhpHIeRvsDawqns0qeN5+y967tYLyicBYE7EYkYAgAh+QQJCwAAACwAAAAAEAALAAAFNiAgjothLOOIJAkiGgxjpGKiKMkbz7SN6zIawJcDwIK9W/HISxGBzdHTuBNOmcJVCyoUlk7CEAAh+QQJCwAAACwAAAAAEAALAAAFNSAgjqQIRRFUAo3jNGIkSdHqPI8Tz3V55zuaDacDyIQ+YrBH+hWPzJFzOQQaeavWi7oqnVIhACH5BAkLAAAALAAAAAAQAAsAAAUyICCOZGme1rJY5kRRk7hI0mJSVUXJtF3iOl7tltsBZsNfUegjAY3I5sgFY55KqdX1GgIAIfkECQsAAAAsAAAAABAACwAABTcgII5kaZ4kcV2EqLJipmnZhWGXaOOitm2aXQ4g7P2Ct2ER4AMul00kj5g0Al8tADY2y6C+4FIIACH5BAkLAAAALAAAAAAQAAsAAAUvICCOZGme5ERRk6iy7qpyHCVStA3gNa/7txxwlwv2isSacYUc+l4tADQGQ1mvpBAAIfkECQsAAAAsAAAAABAACwAABS8gII5kaZ7kRFGTqLLuqnIcJVK0DeA1r/u3HHCXC/aKxJpxhRz6Xi0ANAZDWa+kEAA7AAAAAAAAAAAA" />'  
+  }
+};
+window.DemandJSDemanded = new DemandJS(options);
+```
+
+In this configuration above, image1 (which has no data-demand attribute) will use the ```loadingHtml``` configuration associated with the 'default' demand class. Image2 (which has data-demand="spinner") will use the ```loadingHtml``` configuration with the base64 encoded spinner gif. Image3 (which has data-demand="progress") will use the ```loadingHtml``` configuration with the base64 encoded progress bar gif. Image4 (which has data-demand="hideError") is in the hideError demand class, which does not have a configuration for ```loadingHtml``` and so the default (same as Image1) is used instead.
+
+Any option that supports demand classes can be defined in a similar way to ```loadingHtml``` above. If demand classes are not required, simply define those options directly instead.
+
+Demand classes are supported for all of the following options:
+
+  * loadingHtml ([see test012](test/test012.html))
+  * failureHtml ([see test013](test/test013.html))
+  * createLoadingNode ([see test014](test/test014.html))
+  * createFailureNode ([see test015](test/test015.html))
+  * onLoadBegin ([see test016](test/test016.html))
+  * onLoadSuccess ([see test017](test/test017.html))
+  * onLoadComplete ([see test018](test/test018.html))
+  * onLoadFailure ([see test019](test/test019.html))
+
 ## Configuration
 
   The DemandJS constructor accepts a single argument, which is the options collection. 
 
   | Field                  | Description | Default |
   |------------------------|-------------|---------|
+  | demandClassAttribute   | This option specifies the attribute used to lookup the demand class on each element | data-demand |
+  | defaultDemandClass     | This option specifies the demand class that is used if no demand class is specified | default |
   | loadingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` |
-  | createLoadingNode      | This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified |
+  | createLoadingNode      | ```function(target){}``` This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified |
   | failureHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` |
-  | createFailureNode     | This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a non-standard (and possibly undefined) error detail, which could possibly be an exception, a generic message, or again undefined. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defines a functor to creating the `failureHtml` |
-  | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. | `img,video,picture,iframe,link.demand` |
+  | createFailureNode     | ```function(target,error){}``` This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a standard javascript 'Error'. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that will be inserted into the DOM automatically. | Defines a functor to creating the `failureHtml` |
+  | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. You may use the full selector syntax (see https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors)  | `img,video,picture,iframe,link.demand` |
+  | ignoreSelector       | This is a css selector, defining elements which should be ignored by demandjs. This is evaluated after the selector is evaluated (so when possible prefer using that) to exclude certain elements from demand loading behaviors. You may use the full selector syntax (see: https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors) | .nodemand |
   | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `48px` |
-  | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the placeholder element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` |
+  | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the loading element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` |
   | onLoadBegin            | `function(target) {}` - this is called each time an element begins loading, the element is passed as an argument  | noop |
   | onLoadSuccess              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop |
   | onLoadFailure              | `function(target, exception) {}` - this is called each time loading fails with error, the element that was loading is passed as the argument 'target'. 'exception' details which will be of type Error.  | noop |
@@ -201,7 +252,7 @@ polyfills that are only required for specific features.
 * HTMLElement.matches - essential (IE8/IE9 only?)
 * fetch - currently only required when fetching links
 * promise - currently only required when fetchign links
-
+* hasAttribute - for <= ie7
 
 ## Build Dependencies
 
@@ -227,22 +278,34 @@ Additional test cases are welcome, and without assertions, it should be pretty e
 It should be fairly easy to make assertions using some combination of properties like img.complete / video.buffered and window.scrollTo  for some test cases. The Resource Timing API (https://www.w3.org/TR/resource-timing/) or whatever comes of this proposed technology might also be a resonable choice for implementing assertions in the future, but compatibility would be very limited without polyfills in the short term.
 
 ### Test Index
- * [test001](test/test001.html)
- * [test002](test/test002.html)
- * [test003](test/test003.html)
- * [test003_error](test/test003_error.html)
- * [test004](test/test004.html)
- * [test005](test/test005.html)
- * [test005_error](test/test005_error.html)
- * [test006](test/test006.html)
- * [test007](test/test007.html)
- * [test008](test/test008.html)
- * [test009](test/test009.html)
- * [test010](test/test010.html)
- * [test011](test/test011.html)
+* [test001](test/test001.html)
+* [test002](test/test002.html)
+* [test003](test/test003.html)
+* [test003_error](test/test003_error.html)
+* [test004](test/test004.html)
+* [test005](test/test005.html)
+* [test005_error](test/test005_error.html)
+* [test006](test/test006.html)
+* [test007](test/test007.html)
+* [test008](test/test008.html)
+* [test009](test/test009.html)
+* [test010](test/test010.html)
+* [test011](test/test011.html)
+* [test012](test/test012.html)
+* [test013](test/test013.html)
+* [test014](test/test014.html)
+* [test015](test/test015.html)
+* [test016](test/test016.html)
+* [test017](test/test017.html)
+* [test018](test/test018.html)
+* [test019](test/test019.html)
+* [test020](test/test020.html)
 
 ## Release Notes 
 
+* 1.0.0-rc.1 - added demand Classes
+* 1.0.0-rc.1 - added ignoreSelector
+* 1.0.0-rc.1 - bugfixes
 * 0.0.4 - error handling fleshed out and tested
 * 0.0.3 - added 'linkHandler' option and more documentation improvements
 * 0.0.2 - added support for srcset attribute, picture elements, and more advanced usages of video (audio) that embed source elements as opposed to using direct src fields

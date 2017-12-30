@@ -4,6 +4,19 @@
   </head>
   <body>
     <link rel="prefetch" class="demand" type="text/markdown" href="README.md" />
+
+    <!-- by placing this iframe here (and hiding it) the browser requests the README.md and waits for it to fully load
+         before moving on to parsing the rest of the page, later when demandjs requests that README.md the content is already 
+         loaded and inserted into the DOM instantly.
+
+         This is useful because, (at least in chrome) the browser completely renders the README.md before the pageLoad event
+         is triggered. This means when you click a link to one of the tests, then hit the back button from the test to come
+         back to this page, the browsers built-in scrollback mechanism will scroll down to the link you had clicked on to go to the test
+         (e.g. where you were previously). If the request for README.md doesn't complete before the pageLoad event (and if the markdown
+         code isn't inserted into the DOM before the pageLoad event) the browser will not do this scrolling for you and visiting
+         tests will be pretty annoying.
+    -->
+    <iframe class="nodemand" src="README.md" style="display:none"></iframe>     
     <script src="demandjs.debug.js"></script>
     <script type="text/javascript">
     var showdownConverter = new showdown.Converter();

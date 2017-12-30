@@ -1,5 +1,7 @@
 'use strict';
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -110,7 +112,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         if (registration.extraData.shouldInjectLink) {
           var url = registration.extraData.href;
-          this.options.onLoadBegin(target);
+
+          var onLoadBegin = this.selectByDemandClass(target, this.options.onLoadBegin, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadBegin);
+          onLoadBegin.call(this, target);
+
           fetch(url).then(function (response) {
             if (!response.ok) {
               var error = new Error('Fetching "' + url + '" failed with ' + response.status + ' ' + response.statusText);
@@ -133,8 +138,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
-      key: 'isLoaded',
-      value: function isLoaded(target) {
+      key: 'isResourceLoaded',
+      value: function isResourceLoaded(target) {
         return target.complete || false;
       }
     }, {
@@ -284,13 +289,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         this.cleanupRegistrationTarget(registration);
-        this.options.onLoadSuccess.call(this, target);
-        this.options.onLoadComplete.call(this, target);
-      }
-    }, {
-      key: 'onLoadSuccess',
-      value: function onLoadSuccess(target) {
-        //  nothing to do here
+
+        var onLoadSuccess = this.selectByDemandClass(target, this.options.onLoadSuccess, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadSuccess);
+        onLoadSuccess.call(this, target);
+        var onLoadComplete = this.selectByDemandClass(target, this.options.onLoadComplete, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadComplete);
+        onLoadComplete.call(this, target);
       }
     }, {
       key: 'cleanupPlaceholder',
@@ -320,6 +323,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             ex = new Error(ex);
           }
         }
+        var onLoadFailure = this.selectByDemandClass(target, this.options.onLoadFailure, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadFailure);
+
         var first = true;
         var _iteratorNormalCompletion7 = true;
         var _didIteratorError7 = false;
@@ -336,7 +341,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                 placeholder.parentNode.insertBefore(target, placeholder);
               }
 
-              this.options.onLoadFailure.call(this, target, ex);
+              onLoadFailure.call(this, target, ex);
             }
             this.cleanupPlaceholder(placeholder);
           }
@@ -356,16 +361,33 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         if (first) {
-          this.options.onLoadFailure.call(this, target, ex);
+          onLoadFailure.call(this, target, ex);
         }
 
         this.cleanupRegistrationTarget(registration);
-        this.options.onLoadComplete.call(this, target);
+        var onLoadComplete = this.selectByDemandClass(target, this.options.onLoadComplete, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadComplete);
+        onLoadComplete.call(this, target);
+      }
+    }, {
+      key: 'onLoadBegin',
+      value: function onLoadBegin(t) {
+        //  nothing to do here
+      }
+    }, {
+      key: 'onLoadSuccess',
+      value: function onLoadSuccess(target) {
+        //  nothing to do here
+      }
+    }, {
+      key: 'onLoadComplete',
+      value: function onLoadComplete(target) {
+        //  nothing to do here
       }
     }, {
       key: 'onLoadFailure',
       value: function onLoadFailure(target, ex) {
-        var errorUI = this.options.createFailureNode.call(this, target, ex);
+        var createFailureNode = this.selectByDemandClass(target, this.options.createFailureNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createFailureNode);
+        var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
         var _iteratorNormalCompletion8 = true;
         var _didIteratorError8 = false;
@@ -374,6 +396,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         try {
           for (var _iterator8 = errorUI[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
             var eui = _step8.value;
+
+            // register placeholders so if they contain media we dont try to demand load them...
+            this.loaded.set(eui, true);
 
             target.parentNode.insertBefore(eui, target);
           }
@@ -397,17 +422,48 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
+      key: 'selectByDemandClass',
+      value: function selectByDemandClass(t, data, attr, defaultKey, defaultData) {
+        if (!data) {
+          return defaultData;
+        }
+        if ((typeof data === 'undefined' ? 'undefined' : _typeof(data)) === 'object') {
+          var key = defaultKey;
+          if (t.hasAttribute(attr)) {
+            key = t.getAttribute(attr);
+          }
+          do {
+            if (key in data) {
+              data = data[key];
+              break;
+            } else if (key === defaultKey) {
+              data = defaultData;
+              break;
+            }
+            key = defaultKey;
+          } while (true);
+        }
+
+        return data;
+      }
+    }, {
       key: 'createFailureNode',
-      value: function createFailureNode() {
+      value: function createFailureNode(t, ex) {
         var ele = document.createElement('div');
-        ele.innerHTML = this.options.failureHtml;
+
+        var html = this.selectByDemandClass(t, this.options.failureHtml, this.options.demandClassAttribute, this.options.defaultDemandClass, this.defaultFailureHtml);
+        ele.innerHTML = html;
+
         return ele.childNodes;
       }
     }, {
       key: 'createLoadingNode',
-      value: function createLoadingNode() {
+      value: function createLoadingNode(t) {
         var ele = document.createElement('div');
-        ele.innerHTML = this.options.loadingHtml;
+
+        var html = this.selectByDemandClass(t, this.options.loadingHtml, this.options.demandClassAttribute, this.options.defaultDemandClass, this.defaultLoadingHtml);
+        ele.innerHTML = html;
+
         return ele.childNodes;
       }
     }, {
@@ -447,7 +503,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         var extraData = registration.extraData;
         registration.loading = true;
-        this.options.onLoadBegin(target);
+
+        var onLoadBegin = this.selectByDemandClass(target, this.options.onLoadBegin, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadBegin);
+        onLoadBegin.call(this, target);
 
         this._restoreTargetInternal(target, extraData);
 
@@ -581,14 +639,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'observeTarget',
       value: function observeTarget(target) {
-        if (this.isLoaded(target)) {
+        if (this.isResourceLoaded(target)) {
           // do nothing, its already fully loaded
         } else if (this.isContextExcluded(target)) {
           // do nothing, another element should take care of it
         } else {
           var store = this.captureTarget(target, target);
-          var placeholders = this.options.createLoadingNode.call(this, target);
+
+          var createLoadingNode = this.selectByDemandClass(target, this.options.createLoadingNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createLoadingNode);
+          var placeholders = createLoadingNode.call(this, target);
           placeholders = Array.prototype.slice.call(placeholders);
+
           var _iteratorNormalCompletion9 = true;
           var _didIteratorError9 = false;
           var _iteratorError9 = undefined;
@@ -598,6 +659,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               var placeholder = _step9.value;
 
               this.registerPlaceholder(placeholder, target, placeholders, store);
+              // register placeholders so if they contain media we dont try to demand load them...
+              this.loaded.set(placeholder, true);
               target.parentNode.insertBefore(placeholder, target);
               this.intersection.observe(placeholder);
             }
@@ -653,12 +716,26 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
+      key: 'isLoadedRecursive',
+      value: function isLoadedRecursive(target) {
+        if (this.loaded.has(target)) {
+          return true;
+        }
+        if (target.parentNode) {
+          return this.isLoadedRecursive(target.parentNode);
+        }
+        return false;
+      }
+    }, {
       key: 'isTargetMatch',
       value: function isTargetMatch(target) {
-        if (this.loaded.has(target)) {
-          return false;
+        if ('matches' in target && target.matches(this.options.selector)) {
+          if (this.options.ignoreSelector && target.matches(this.options.ignoreSelector)) {
+            return false;
+          }
+          return !this.isLoadedRecursive(target);
         }
-        return 'matches' in target && target.matches(this.options.selector);
+        return false;
       }
     }, {
       key: 'queryTargets',
@@ -672,6 +749,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           for (var _iterator11 = document.querySelectorAll(this.options.selector)[Symbol.iterator](), _step11; !(_iteratorNormalCompletion11 = (_step11 = _iterator11.next()).done); _iteratorNormalCompletion11 = true) {
             var node = _step11.value;
 
+            if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) {
+              continue;
+            }
             result.push(node);
           }
         } catch (err) {
@@ -711,14 +791,20 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         newHandlers = options.linkHandler;
         delete options.linkHandler;
       }
+
+      this.defaultLoadingHtml = '<div style="width:100%;height:100%">Loading In Progress</div>';
+      this.defaultFailureHtml = '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>';
+
       this.options = Object.assign({
-        loadingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        failureHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
+        demandClassAttribute: 'data-demand',
+        defaultDemandClass: 'default',
+        loadingHtml: this.defaultLoadingHtml,
+        failureHtml: this.defaultFailureHtml,
         createLoadingNode: function createLoadingNode(t) {
-          return _this4.createLoadingNode();
+          return _this4.createLoadingNode(t);
         },
         createFailureNode: function createFailureNode(t, ex) {
-          return _this4.createFailureNode();
+          return _this4.createFailureNode(t, ex);
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
@@ -727,16 +813,21 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           return _this4.options.shouldRemove(t);
         },
         selector: 'img,video,picture,iframe,link.demand',
+        ignoreSelector: '.nodemand',
         rootMargin: '48px',
         threshold: 0,
-        onLoadBegin: function onLoadBegin(t) {},
+        onLoadBegin: function onLoadBegin(t) {
+          return _this4.onLoadBegin(t);
+        },
         onLoadSuccess: function onLoadSuccess(t) {
           return _this4.onLoadSuccess(t);
         },
         onLoadFailure: function onLoadFailure(t, e) {
           return _this4.onLoadFailure(t, e);
         },
-        onLoadComplete: function onLoadComplete(t) {},
+        onLoadComplete: function onLoadComplete(t) {
+          return _this4.onLoadComplete(t);
+        },
         linkHandler: {
           'text/html': function textHtml(t, c) {
             return _this4.injectHtml(t, c);

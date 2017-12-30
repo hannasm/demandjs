@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.0.0.4 */
+/** @preserve DemandJS - v.1.0.0-rc.1 */
 (function (ctx) {
   class DemandJS {
     observeMutation(mutations) {
@@ -24,7 +24,14 @@
       var {target, registration} = this.resolveTarget(target);
       if (registration.extraData.shouldInjectLink) {
         let url = registration.extraData.href;
-        this.options.onLoadBegin(target);
+
+        let onLoadBegin = this.selectByDemandClass(
+            target, this.options.onLoadBegin,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.onLoadBegin);
+        onLoadBegin.call(this, target);
+
         fetch(url).then(function (response) {
           if (!response.ok) {
             var error = new Error('Fetching "' + url + '" failed with ' + response.status + ' ' + response.statusText);
@@ -44,7 +51,7 @@
         throw 'Unknown load operation';
       }
     }
-    isLoaded(target) {
+    isResourceLoaded(target) {
       return target.complete || false;
     }
     injectLink(target, txt) {
@@ -111,11 +118,19 @@
         this.cleanupPlaceholder(placeholder);
       }
       this.cleanupRegistrationTarget(registration);
-      this.options.onLoadSuccess.call(this, target);
-      this.options.onLoadComplete.call(this, target);
-    }
-    onLoadSuccess(target) {
-      //  nothing to do here
+
+      let onLoadSuccess = this.selectByDemandClass(
+          target, this.options.onLoadSuccess,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.onLoadSuccess);
+      onLoadSuccess.call(this, target);
+      let onLoadComplete = this.selectByDemandClass(
+          target, this.options.onLoadComplete,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.onLoadComplete);
+      onLoadComplete.call(this, target);
     }
     cleanupPlaceholder(placeholder) {
         this.intersection.unobserve(placeholder);
@@ -136,6 +151,12 @@
           ex = new Error(ex);
         }
       }
+      let onLoadFailure = this.selectByDemandClass(
+          target, this.options.onLoadFailure,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.onLoadFailure);
+
       let first = true;
       for (var placeholder of registration.placeholders) {
         if (first) {
@@ -145,36 +166,90 @@
             placeholder.parentNode.insertBefore(target, placeholder);
           }
 
-          this.options.onLoadFailure.call(this, target, ex);
+          onLoadFailure.call(this, target, ex);
         }
         this.cleanupPlaceholder(placeholder);
       }
       if (first) {
-        this.options.onLoadFailure.call(this, target, ex);
+        onLoadFailure.call(this, target, ex);
       }
 
       this.cleanupRegistrationTarget(registration);
-      this.options.onLoadComplete.call(this, target);
+      let onLoadComplete = this.selectByDemandClass(
+          target, this.options.onLoadComplete,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.onLoadComplete);
+      onLoadComplete.call(this, target);
+    }
+    onLoadBegin(t) {
+      //  nothing to do here
+    }
+    onLoadSuccess(target) {
+      //  nothing to do here
+    }
+    onLoadComplete(target) {
+      //  nothing to do here
     }
     onLoadFailure(target, ex) {
-        var errorUI = this.options.createFailureNode.call(this, target, ex);
+        var createFailureNode = this.selectByDemandClass(
+            target, this.options.createFailureNode,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.createFailureNode);
+        var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
         for (var eui of errorUI) {
+          // register placeholders so if they contain media we dont try to demand load them...
+          this.loaded.set(eui, true); 
+
           target.parentNode.insertBefore(eui, target);
         }
         if (this.options.shouldRemove(target)) {
           target.parentNode.removeChild(target);
         }
     }
-    
-    createFailureNode() {
+    selectByDemandClass(t, data, attr, defaultKey, defaultData) {
+      if (!data) { return defaultData; }
+      if (typeof data === 'object') {
+        let key = defaultKey;
+        if (t.hasAttribute(attr)) { key = t.getAttribute(attr); }
+        do {
+          if (key in data) {
+            data = data[key];
+            break;
+          } else if (key === defaultKey) {
+            data = defaultData;
+            break;
+          }
+          key = defaultKey;
+        } while (true);
+      } 
+
+      return data;
+    }
+    createFailureNode(t,ex) {
       var ele = document.createElement('div');
-      ele.innerHTML = this.options.failureHtml;
+
+      let html = this.selectByDemandClass(t, 
+          this.options.failureHtml, 
+          this.options.demandClassAttribute, 
+          this.options.defaultDemandClass, 
+          this.defaultFailureHtml);
+      ele.innerHTML = html;
+
       return ele.childNodes;
     }
-    createLoadingNode() {
+    createLoadingNode(t) {
       var ele = document.createElement('div');
-      ele.innerHTML = this.options.loadingHtml;
+      
+      let html = this.selectByDemandClass(t, 
+          this.options.loadingHtml, 
+          this.options.demandClassAttribute, 
+          this.options.defaultDemandClass, 
+          this.defaultLoadingHtml);
+      ele.innerHTML = html;
+
       return ele.childNodes;
     }
     registerPlaceholder(node, target, placeholders, extraData) {
@@ -205,7 +280,13 @@
       var {target, registration} = this.resolveTarget(target);
       var extraData = registration.extraData;
       registration.loading = true;
-      this.options.onLoadBegin(target);
+
+      let onLoadBegin = this.selectByDemandClass(
+          target, this.options.onLoadBegin,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.onLoadBegin);
+      onLoadBegin.call(this, target);
 
       this._restoreTargetInternal(target, extraData);
 
@@ -318,16 +399,25 @@
       return this.isContextExcluded(parent);
     }
     observeTarget(target) {
-      if (this.isLoaded(target)) {
+      if (this.isResourceLoaded(target)) {
         // do nothing, its already fully loaded
       } else if (this.isContextExcluded(target)) { 
         // do nothing, another element should take care of it
       } else {
         var store = this.captureTarget(target, target);
-        var placeholders = this.options.createLoadingNode.call(this, target);
+
+        var createLoadingNode = this.selectByDemandClass(
+            target, this.options.createLoadingNode,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.createLoadingNode);
+        var placeholders = createLoadingNode.call(this, target);
         placeholders = Array.prototype.slice.call(placeholders);
+
         for (var placeholder of placeholders) {
           this.registerPlaceholder(placeholder, target, placeholders, store);
+          // register placeholders so if they contain media we dont try to demand load them...
+          this.loaded.set(placeholder, true); 
           target.parentNode.insertBefore(placeholder, target);
           this.intersection.observe(placeholder);
         }
@@ -344,13 +434,24 @@
         this.observeTarget(target);
       }
     }
+    isLoadedRecursive(target) {
+      if (this.loaded.has(target)) { return true; }
+      if (target.parentNode) {
+       return this.isLoadedRecursive(target.parentNode);
+      }
+     return false; 
+    }
     isTargetMatch(target) {
-      if (this.loaded.has(target)) { return false; }
-      return 'matches' in target && target.matches(this.options.selector);
+      if ('matches' in target && target.matches(this.options.selector)) {
+        if (this.options.ignoreSelector && target.matches(this.options.ignoreSelector)) { return false; }
+       return !this.isLoadedRecursive(target);
+      }
+      return false;
     }
     queryTargets() {
       let result = [];
       for (var node of document.querySelectorAll(this.options.selector)) {
+        if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) { continue; }
         result.push(node);
       }
       return result;
@@ -367,20 +468,27 @@
         newHandlers = options.linkHandler;
         delete options.linkHandler;
       }
+
+      this.defaultLoadingHtml = '<div style="width:100%;height:100%">Loading In Progress</div>';
+      this.defaultFailureHtml = '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>';
+
       this.options = Object.assign({
-        loadingHtml: '<div style="width:100%;height:100%">Loading In Progress</div>',
-        failureHtml: '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>',
-        createLoadingNode: t=>this.createLoadingNode(),
-        createFailureNode: (t,ex)=>this.createFailureNode(),
+        demandClassAttribute: 'data-demand',
+        defaultDemandClass: 'default',
+        loadingHtml: this.defaultLoadingHtml,
+        failureHtml: this.defaultFailureHtml,
+        createLoadingNode: t=>this.createLoadingNode(t),
+        createFailureNode: (t,ex)=>this.createFailureNode(t, ex),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
         selector: 'img,video,picture,iframe,link.demand',
+        ignoreSelector: '.nodemand',
         rootMargin: '48px',
         threshold: 0,
-        onLoadBegin: t=>{},
+        onLoadBegin: t=>this.onLoadBegin(t),
         onLoadSuccess: t=>this.onLoadSuccess(t),
         onLoadFailure: (t,e)=>this.onLoadFailure(t,e),
-        onLoadComplete: t=>{},
+        onLoadComplete: t=>this.onLoadComplete(t),
         linkHandler: {
           'text/html': (t,c)=>this.injectHtml(t,c),
           'application/xhtml+xml': (t,c)=>this.injectHtml(t,c)

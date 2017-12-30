@@ -1,0 +1,32 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {i
+        var cls = '';
+        if (i%3 == 0) {
+          cls = 'data-demand="override" ';
+        } else if (i%3 == 1) {
+          cls = 'data-demand="fallback" ';
+        }
+
+        document.write('<img src="' + window.error_images[i] + '" ' + cls + '/><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var options = {
+        demandClassAttribute: 'data-demand',
+        defaultDemandClass: 'default',
+        failureHtml: {
+          'default': '<div>This is default error message</div>',
+          'override': '<div>This is demand class override error message</div>'
+        }
+      };
+      window.DemandJSDemanded = new DemandJS(options);
+    </script>
+  </body>
+</html>

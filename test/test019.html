@@ -1,0 +1,43 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <div id="insertBeforeMe"></div>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {i
+        var cls = '';
+        if (i%3 == 0) {
+          cls = 'data-demand="override" ';
+        } else if (i%3 == 1) {
+          cls = 'data-demand="fallback" ';
+        }
+
+        document.write('<img src="' + window.error_images[i] + '" ' + cls + '/><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var options = {
+        demandClassAttribute: 'data-demand',
+        defaultDemandClass: 'default',
+        onLoadFailure: {
+          'default': function(t) { 
+            var result = document.createElement('div');
+            result.innerHTML = '<div>This is default onLoadFailure message</div>';
+            document.body.insertBefore(result, document.getElementById('insertBeforeMe'));
+            t.remove();
+          },
+          'override': function(t) { 
+            var result = document.createElement('div');
+            result.innerHTML = '<div>This is override demand class onLoadFailure message</div>';
+            document.body.insertBefore(result, document.getElementById('insertBeforeMe'));
+            t.remove();
+          }
+        }        
+      };
+      window.DemandJSDemanded = new DemandJS(options);
+    </script>
+  </body>
+</html>
