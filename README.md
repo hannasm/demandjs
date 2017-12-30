@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.1 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.2 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -318,9 +318,9 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
-* 1.0.0-rc.1 - added demand Classes
-* 1.0.0-rc.1 - added ignoreSelector
-* 1.0.0-rc.1 - bugfixes
+* 1.0.0-rc.2 - added demand Classes
+* 1.0.0-rc.2 - added ignoreSelector
+* 1.0.0-rc.2 - bugfixes
 * 0.0.4 - error handling fleshed out and tested
 * 0.0.3 - added 'linkHandler' option and more documentation improvements
 * 0.0.2 - added support for srcset attribute, picture elements, and more advanced usages of video (audio) that embed source elements as opposed to using direct src fields

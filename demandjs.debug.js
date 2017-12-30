@@ -6,7 +6,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.1 */
+/** @preserve DemandJS - v.1.0.0-rc.2 */
 (function (ctx) {
   var DemandJS = function () {
     _createClass(DemandJS, [{
