@@ -1,13 +1,33 @@
-/** @preserve DemandJS - v.1.0.0-rc.2 */
+/** @preserve DemandJS - v.1.0.0-rc.3 
+ *
+ * https://github.com/hannasm/demandjs  
+ *
+ **/
 (function (ctx) {
   class DemandJS {
     observeMutation(mutations) {
       for (var mutation of mutations) {
         if (mutation.type !== 'childList') { continue; }
         for (var added of mutation.addedNodes) {
-          if (this.isTargetMatch(added)) {
-            this.observeTarget(added);
-          }
+          this.checkAdditionRecursive(added);
+        }
+      }
+    }
+    checkAdditionRecursive(added) {
+      var res = this.isTargetMatch(added);
+      if (!res.loaded) {
+        if (res.isScript && res.injecting) {
+          this.injectedScript(added, res.injecting);
+          return;
+        } else if (res.isMatch) {
+          this.observeTarget(added);
+          return;
+        }
+      } 
+
+      if(added.children) {
+        for (var child of added.children) {
+          this.checkAdditionRecursive(child);
         }
       }
     }
@@ -65,6 +85,22 @@
       }
       this.processSuccess(registration);
     }
+    injectedScript(bc, injecting) {
+      let localScriptId = injecting.id;
+      let codePromise = Promise.resolve(bc.innerHTML);
+      if ('src' in bc && !(!(bc.src))) {
+        codePromise = fetch(bc.src).then(response=>{
+          if (!response.ok) {
+            throw Error(response.status + '_' + response.statusText);
+          }
+          return response.text();
+        });
+        localScriptId = bc.src + '#' + localScriptId;
+      }
+      codePromise.then(code=>{
+        this.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
+      });
+    }
     injectScript(target, id, code) {
       var oldDw = document.write;
       var content = '';
@@ -83,27 +119,17 @@
       var root = document.createElement('html');
       root.innerHTML = txt;
       var bodies = root.getElementsByTagName('body');
-      let scriptId = 1;
+      let injectionId = 1;
+      bodies = Array.prototype.slice.call(bodies);
       for (var body of bodies) {
-        for (var bc of body.children) {
-          if ('tagName' in bc && bc.tagName.match(/script/i)) {
-            let localScriptId = scriptId;
-            scriptId += 1;
-            let codePromise = Promise.resolve(bc.innerHTML);
-            if ('src' in bc && !(!(bc.src))) {
-              codePromise = fetch(bc.src).then(response=>{
-                if (!response.ok) {
-                  throw Error(response.status + '_' + response.statusText);
-                }
-                return response.text();
-              }); 
-            }
-            codePromise.then(code=>{
-              this.injectScript(target, target.href + '.inline[' + localScriptId + '].js', code);
-            });
-          } else {
-            target.parentNode.insertBefore(bc, target);
-          }
+        var clds = Array.prototype.slice.call(body.children);
+        for (var bc of clds) {
+          this.injecting.set(bc, {
+            href: target.href,
+            id: injectionId 
+          });
+          injectionId += 1;
+          target.parentNode.insertBefore(bc, target);
         }
       }
     }
@@ -434,19 +460,31 @@
         this.observeTarget(target);
       }
     }
-    isLoadedRecursive(target) {
-      if (this.loaded.has(target)) { return true; }
-      if (target.parentNode) {
-       return this.isLoadedRecursive(target.parentNode);
+    isLoadedRecursive(target, injecting) {
+      if (this.loaded.has(target)) { return { loaded: true, injecting: injecting || this.injecting.get(target) }; }
+      // we cant be injecting an element and loading it simultaneously
+      if (!injecting && target.parentNode) {
+       return this.isLoadedRecursive(target.parentNode, injecting || this.injecting.get(target));
       }
-     return false; 
+     return { loaded: false, injecting: injecting || this.injecting.get(target) };
+    }
+    isScript(bc) {
+      return !!('tagName' in bc && bc.tagName.match(/^script$/i));
     }
     isTargetMatch(target) {
-      if ('matches' in target && target.matches(this.options.selector)) {
-        if (this.options.ignoreSelector && target.matches(this.options.ignoreSelector)) { return false; }
-       return !this.isLoadedRecursive(target);
+      var isMatch = 'matches' in target && target.matches(this.options.selector);
+      isMatch = isMatch && !(this.options.ignoreSelector && target.matches(this.options.ignoreSelector));
+
+      var isScript = this.isScript(target);
+
+      if (!isMatch && !isScript) {
+        return { isMatch: isMatch, isScript: isScript, loaded: false, injecting: false }; 
       }
-      return false;
+     
+      var result = this.isLoadedRecursive(target, false);
+      result.isMatch = isMatch;
+      result.isScript = isScript;
+      return result;
     }
     queryTargets() {
       let result = [];
@@ -462,6 +500,7 @@
     constructor(options) {
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
+      this.injecting = new WeakMap();
 
       let newHandlers = {};
       if (options && 'linkHandler' in options) {

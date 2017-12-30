@@ -6,7 +6,11 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.2 */
+/** @preserve DemandJS - v.1.0.0-rc.3 
+ *
+ * https://github.com/hannasm/demandjs  
+ *
+ **/
 (function (ctx) {
   var DemandJS = function () {
     _createClass(DemandJS, [{
@@ -31,9 +35,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               for (var _iterator2 = mutation.addedNodes[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
                 var added = _step2.value;
 
-                if (this.isTargetMatch(added)) {
-                  this.observeTarget(added);
-                }
+                this.checkAdditionRecursive(added);
               }
             } catch (err) {
               _didIteratorError2 = true;
@@ -66,15 +68,56 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
+      key: 'checkAdditionRecursive',
+      value: function checkAdditionRecursive(added) {
+        var res = this.isTargetMatch(added);
+        if (!res.loaded) {
+          if (res.isScript && res.injecting) {
+            this.injectedScript(added, res.injecting);
+            return;
+          } else if (res.isMatch) {
+            this.observeTarget(added);
+            return;
+          }
+        }
+
+        if (added.children) {
+          var _iteratorNormalCompletion3 = true;
+          var _didIteratorError3 = false;
+          var _iteratorError3 = undefined;
+
+          try {
+            for (var _iterator3 = added.children[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+              var child = _step3.value;
+
+              this.checkAdditionRecursive(child);
+            }
+          } catch (err) {
+            _didIteratorError3 = true;
+            _iteratorError3 = err;
+          } finally {
+            try {
+              if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                _iterator3.return();
+              }
+            } finally {
+              if (_didIteratorError3) {
+                throw _iteratorError3;
+              }
+            }
+          }
+        }
+      }
+    }, {
       key: 'observeIntersection',
       value: function observeIntersection(intersections) {
-        var _iteratorNormalCompletion3 = true;
-        var _didIteratorError3 = false;
-        var _iteratorError3 = undefined;
+        var _iteratorNormalCompletion4 = true;
+        var _didIteratorError4 = false;
+        var _iteratorError4 = undefined;
 
         try {
-          for (var _iterator3 = intersections[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-            var intersect = _step3.value;
+          for (var _iterator4 = intersections[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            var intersect = _step4.value;
 
             if (!intersect.isIntersecting) {
               continue;
@@ -87,16 +130,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             this.beginLoad(reg);
           }
         } catch (err) {
-          _didIteratorError3 = true;
-          _iteratorError3 = err;
+          _didIteratorError4 = true;
+          _iteratorError4 = err;
         } finally {
           try {
-            if (!_iteratorNormalCompletion3 && _iterator3.return) {
-              _iterator3.return();
+            if (!_iteratorNormalCompletion4 && _iterator4.return) {
+              _iterator4.return();
             }
           } finally {
-            if (_didIteratorError3) {
-              throw _iteratorError3;
+            if (_didIteratorError4) {
+              throw _iteratorError4;
             }
           }
         }
@@ -159,6 +202,26 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.processSuccess(registration);
       }
     }, {
+      key: 'injectedScript',
+      value: function injectedScript(bc, injecting) {
+        var _this2 = this;
+
+        var localScriptId = injecting.id;
+        var codePromise = Promise.resolve(bc.innerHTML);
+        if ('src' in bc && !!bc.src) {
+          codePromise = fetch(bc.src).then(function (response) {
+            if (!response.ok) {
+              throw Error(response.status + '_' + response.statusText);
+            }
+            return response.text();
+          });
+          localScriptId = bc.src + '#' + localScriptId;
+        }
+        codePromise.then(function (code) {
+          _this2.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
+        });
+      }
+    }, {
       key: 'injectScript',
       value: function injectScript(target, id, code) {
         var oldDw = document.write;
@@ -179,74 +242,61 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectHtml',
       value: function injectHtml(target, txt) {
-        var _this2 = this;
-
         var root = document.createElement('html');
         root.innerHTML = txt;
         var bodies = root.getElementsByTagName('body');
-        var scriptId = 1;
-        var _iteratorNormalCompletion4 = true;
-        var _didIteratorError4 = false;
-        var _iteratorError4 = undefined;
+        var injectionId = 1;
+        bodies = Array.prototype.slice.call(bodies);
+        var _iteratorNormalCompletion5 = true;
+        var _didIteratorError5 = false;
+        var _iteratorError5 = undefined;
 
         try {
-          for (var _iterator4 = bodies[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
-            var body = _step4.value;
-            var _iteratorNormalCompletion5 = true;
-            var _didIteratorError5 = false;
-            var _iteratorError5 = undefined;
+          for (var _iterator5 = bodies[Symbol.iterator](), _step5; !(_iteratorNormalCompletion5 = (_step5 = _iterator5.next()).done); _iteratorNormalCompletion5 = true) {
+            var body = _step5.value;
+
+            var clds = Array.prototype.slice.call(body.children);
+            var _iteratorNormalCompletion6 = true;
+            var _didIteratorError6 = false;
+            var _iteratorError6 = undefined;
 
             try {
-              for (var _iterator5 = body.children[Symbol.iterator](), _step5; !(_iteratorNormalCompletion5 = (_step5 = _iterator5.next()).done); _iteratorNormalCompletion5 = true) {
-                var bc = _step5.value;
+              for (var _iterator6 = clds[Symbol.iterator](), _step6; !(_iteratorNormalCompletion6 = (_step6 = _iterator6.next()).done); _iteratorNormalCompletion6 = true) {
+                var bc = _step6.value;
 
-                if ('tagName' in bc && bc.tagName.match(/script/i)) {
-                  (function () {
-                    var localScriptId = scriptId;
-                    scriptId += 1;
-                    var codePromise = Promise.resolve(bc.innerHTML);
-                    if ('src' in bc && !!bc.src) {
-                      codePromise = fetch(bc.src).then(function (response) {
-                        if (!response.ok) {
-                          throw Error(response.status + '_' + response.statusText);
-                        }
-                        return response.text();
-                      });
-                    }
-                    codePromise.then(function (code) {
-                      _this2.injectScript(target, target.href + '.inline[' + localScriptId + '].js', code);
-                    });
-                  })();
-                } else {
-                  target.parentNode.insertBefore(bc, target);
-                }
+                this.injecting.set(bc, {
+                  href: target.href,
+                  id: injectionId
+                });
+                injectionId += 1;
+                target.parentNode.insertBefore(bc, target);
               }
             } catch (err) {
-              _didIteratorError5 = true;
-              _iteratorError5 = err;
+              _didIteratorError6 = true;
+              _iteratorError6 = err;
             } finally {
               try {
-                if (!_iteratorNormalCompletion5 && _iterator5.return) {
-                  _iterator5.return();
+                if (!_iteratorNormalCompletion6 && _iterator6.return) {
+                  _iterator6.return();
                 }
               } finally {
-                if (_didIteratorError5) {
-                  throw _iteratorError5;
+                if (_didIteratorError6) {
+                  throw _iteratorError6;
                 }
               }
             }
           }
         } catch (err) {
-          _didIteratorError4 = true;
-          _iteratorError4 = err;
+          _didIteratorError5 = true;
+          _iteratorError5 = err;
         } finally {
           try {
-            if (!_iteratorNormalCompletion4 && _iterator4.return) {
-              _iterator4.return();
+            if (!_iteratorNormalCompletion5 && _iterator5.return) {
+              _iterator5.return();
             }
           } finally {
-            if (_didIteratorError4) {
-              throw _iteratorError4;
+            if (_didIteratorError5) {
+              throw _iteratorError5;
             }
           }
         }
@@ -259,13 +309,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             registration = _resolveTarget3.registration;
 
         var first = this.options.shouldInsertOnLoad(registration.target);
-        var _iteratorNormalCompletion6 = true;
-        var _didIteratorError6 = false;
-        var _iteratorError6 = undefined;
+        var _iteratorNormalCompletion7 = true;
+        var _didIteratorError7 = false;
+        var _iteratorError7 = undefined;
 
         try {
-          for (var _iterator6 = registration.placeholders[Symbol.iterator](), _step6; !(_iteratorNormalCompletion6 = (_step6 = _iterator6.next()).done); _iteratorNormalCompletion6 = true) {
-            var placeholder = _step6.value;
+          for (var _iterator7 = registration.placeholders[Symbol.iterator](), _step7; !(_iteratorNormalCompletion7 = (_step7 = _iterator7.next()).done); _iteratorNormalCompletion7 = true) {
+            var placeholder = _step7.value;
 
             if (first) {
               first = false;
@@ -274,16 +324,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             this.cleanupPlaceholder(placeholder);
           }
         } catch (err) {
-          _didIteratorError6 = true;
-          _iteratorError6 = err;
+          _didIteratorError7 = true;
+          _iteratorError7 = err;
         } finally {
           try {
-            if (!_iteratorNormalCompletion6 && _iterator6.return) {
-              _iterator6.return();
+            if (!_iteratorNormalCompletion7 && _iterator7.return) {
+              _iterator7.return();
             }
           } finally {
-            if (_didIteratorError6) {
-              throw _iteratorError6;
+            if (_didIteratorError7) {
+              throw _iteratorError7;
             }
           }
         }
@@ -326,13 +376,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var onLoadFailure = this.selectByDemandClass(target, this.options.onLoadFailure, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadFailure);
 
         var first = true;
-        var _iteratorNormalCompletion7 = true;
-        var _didIteratorError7 = false;
-        var _iteratorError7 = undefined;
+        var _iteratorNormalCompletion8 = true;
+        var _didIteratorError8 = false;
+        var _iteratorError8 = undefined;
 
         try {
-          for (var _iterator7 = registration.placeholders[Symbol.iterator](), _step7; !(_iteratorNormalCompletion7 = (_step7 = _iterator7.next()).done); _iteratorNormalCompletion7 = true) {
-            var placeholder = _step7.value;
+          for (var _iterator8 = registration.placeholders[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
+            var placeholder = _step8.value;
 
             if (first) {
               first = false;
@@ -346,16 +396,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             this.cleanupPlaceholder(placeholder);
           }
         } catch (err) {
-          _didIteratorError7 = true;
-          _iteratorError7 = err;
+          _didIteratorError8 = true;
+          _iteratorError8 = err;
         } finally {
           try {
-            if (!_iteratorNormalCompletion7 && _iterator7.return) {
-              _iterator7.return();
+            if (!_iteratorNormalCompletion8 && _iterator8.return) {
+              _iterator8.return();
             }
           } finally {
-            if (_didIteratorError7) {
-              throw _iteratorError7;
+            if (_didIteratorError8) {
+              throw _iteratorError8;
             }
           }
         }
@@ -389,13 +439,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var createFailureNode = this.selectByDemandClass(target, this.options.createFailureNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createFailureNode);
         var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
-        var _iteratorNormalCompletion8 = true;
-        var _didIteratorError8 = false;
-        var _iteratorError8 = undefined;
+        var _iteratorNormalCompletion9 = true;
+        var _didIteratorError9 = false;
+        var _iteratorError9 = undefined;
 
         try {
-          for (var _iterator8 = errorUI[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
-            var eui = _step8.value;
+          for (var _iterator9 = errorUI[Symbol.iterator](), _step9; !(_iteratorNormalCompletion9 = (_step9 = _iterator9.next()).done); _iteratorNormalCompletion9 = true) {
+            var eui = _step9.value;
 
             // register placeholders so if they contain media we dont try to demand load them...
             this.loaded.set(eui, true);
@@ -403,16 +453,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             target.parentNode.insertBefore(eui, target);
           }
         } catch (err) {
-          _didIteratorError8 = true;
-          _iteratorError8 = err;
+          _didIteratorError9 = true;
+          _iteratorError9 = err;
         } finally {
           try {
-            if (!_iteratorNormalCompletion8 && _iterator8.return) {
-              _iterator8.return();
+            if (!_iteratorNormalCompletion9 && _iterator9.return) {
+              _iterator9.return();
             }
           } finally {
-            if (_didIteratorError8) {
-              throw _iteratorError8;
+            if (_didIteratorError9) {
+              throw _iteratorError9;
             }
           }
         }
@@ -650,13 +700,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           var placeholders = createLoadingNode.call(this, target);
           placeholders = Array.prototype.slice.call(placeholders);
 
-          var _iteratorNormalCompletion9 = true;
-          var _didIteratorError9 = false;
-          var _iteratorError9 = undefined;
+          var _iteratorNormalCompletion10 = true;
+          var _didIteratorError10 = false;
+          var _iteratorError10 = undefined;
 
           try {
-            for (var _iterator9 = placeholders[Symbol.iterator](), _step9; !(_iteratorNormalCompletion9 = (_step9 = _iterator9.next()).done); _iteratorNormalCompletion9 = true) {
-              var placeholder = _step9.value;
+            for (var _iterator10 = placeholders[Symbol.iterator](), _step10; !(_iteratorNormalCompletion10 = (_step10 = _iterator10.next()).done); _iteratorNormalCompletion10 = true) {
+              var placeholder = _step10.value;
 
               this.registerPlaceholder(placeholder, target, placeholders, store);
               // register placeholders so if they contain media we dont try to demand load them...
@@ -665,16 +715,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               this.intersection.observe(placeholder);
             }
           } catch (err) {
-            _didIteratorError9 = true;
-            _iteratorError9 = err;
+            _didIteratorError10 = true;
+            _iteratorError10 = err;
           } finally {
             try {
-              if (!_iteratorNormalCompletion9 && _iterator9.return) {
-                _iterator9.return();
+              if (!_iteratorNormalCompletion10 && _iterator10.return) {
+                _iterator10.return();
               }
             } finally {
-              if (_didIteratorError9) {
-                throw _iteratorError9;
+              if (_didIteratorError10) {
+                throw _iteratorError10;
               }
             }
           }
@@ -690,69 +740,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'observeTargets',
       value: function observeTargets(targets) {
-        var _iteratorNormalCompletion10 = true;
-        var _didIteratorError10 = false;
-        var _iteratorError10 = undefined;
-
-        try {
-          for (var _iterator10 = targets[Symbol.iterator](), _step10; !(_iteratorNormalCompletion10 = (_step10 = _iterator10.next()).done); _iteratorNormalCompletion10 = true) {
-            var target = _step10.value;
-
-            this.observeTarget(target);
-          }
-        } catch (err) {
-          _didIteratorError10 = true;
-          _iteratorError10 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion10 && _iterator10.return) {
-              _iterator10.return();
-            }
-          } finally {
-            if (_didIteratorError10) {
-              throw _iteratorError10;
-            }
-          }
-        }
-      }
-    }, {
-      key: 'isLoadedRecursive',
-      value: function isLoadedRecursive(target) {
-        if (this.loaded.has(target)) {
-          return true;
-        }
-        if (target.parentNode) {
-          return this.isLoadedRecursive(target.parentNode);
-        }
-        return false;
-      }
-    }, {
-      key: 'isTargetMatch',
-      value: function isTargetMatch(target) {
-        if ('matches' in target && target.matches(this.options.selector)) {
-          if (this.options.ignoreSelector && target.matches(this.options.ignoreSelector)) {
-            return false;
-          }
-          return !this.isLoadedRecursive(target);
-        }
-        return false;
-      }
-    }, {
-      key: 'queryTargets',
-      value: function queryTargets() {
-        var result = [];
         var _iteratorNormalCompletion11 = true;
         var _didIteratorError11 = false;
         var _iteratorError11 = undefined;
 
         try {
-          for (var _iterator11 = document.querySelectorAll(this.options.selector)[Symbol.iterator](), _step11; !(_iteratorNormalCompletion11 = (_step11 = _iterator11.next()).done); _iteratorNormalCompletion11 = true) {
-            var node = _step11.value;
+          for (var _iterator11 = targets[Symbol.iterator](), _step11; !(_iteratorNormalCompletion11 = (_step11 = _iterator11.next()).done); _iteratorNormalCompletion11 = true) {
+            var target = _step11.value;
 
-            if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) {
-              continue;
-            }
-            result.push(node);
+            this.observeTarget(target);
           }
         } catch (err) {
           _didIteratorError11 = true;
@@ -765,6 +761,72 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           } finally {
             if (_didIteratorError11) {
               throw _iteratorError11;
+            }
+          }
+        }
+      }
+    }, {
+      key: 'isLoadedRecursive',
+      value: function isLoadedRecursive(target, injecting) {
+        if (this.loaded.has(target)) {
+          return { loaded: true, injecting: injecting || this.injecting.get(target) };
+        }
+        // we cant be injecting an element and loading it simultaneously
+        if (!injecting && target.parentNode) {
+          return this.isLoadedRecursive(target.parentNode, injecting || this.injecting.get(target));
+        }
+        return { loaded: false, injecting: injecting || this.injecting.get(target) };
+      }
+    }, {
+      key: 'isScript',
+      value: function isScript(bc) {
+        return !!('tagName' in bc && bc.tagName.match(/^script$/i));
+      }
+    }, {
+      key: 'isTargetMatch',
+      value: function isTargetMatch(target) {
+        var isMatch = 'matches' in target && target.matches(this.options.selector);
+        isMatch = isMatch && !(this.options.ignoreSelector && target.matches(this.options.ignoreSelector));
+
+        var isScript = this.isScript(target);
+
+        if (!isMatch && !isScript) {
+          return { isMatch: isMatch, isScript: isScript, loaded: false, injecting: false };
+        }
+
+        var result = this.isLoadedRecursive(target, false);
+        result.isMatch = isMatch;
+        result.isScript = isScript;
+        return result;
+      }
+    }, {
+      key: 'queryTargets',
+      value: function queryTargets() {
+        var result = [];
+        var _iteratorNormalCompletion12 = true;
+        var _didIteratorError12 = false;
+        var _iteratorError12 = undefined;
+
+        try {
+          for (var _iterator12 = document.querySelectorAll(this.options.selector)[Symbol.iterator](), _step12; !(_iteratorNormalCompletion12 = (_step12 = _iterator12.next()).done); _iteratorNormalCompletion12 = true) {
+            var node = _step12.value;
+
+            if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) {
+              continue;
+            }
+            result.push(node);
+          }
+        } catch (err) {
+          _didIteratorError12 = true;
+          _iteratorError12 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion12 && _iterator12.return) {
+              _iterator12.return();
+            }
+          } finally {
+            if (_didIteratorError12) {
+              throw _iteratorError12;
             }
           }
         }
@@ -785,6 +847,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
+      this.injecting = new WeakMap();
 
       var newHandlers = {};
       if (options && 'linkHandler' in options) {

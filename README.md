@@ -1,9 +1,9 @@
 # DemandJS
-![logo](logo_transparent.png)
+[![logo](logo_transparent.png)](https://github.com/hannasm/demandjs)
 
 ## Version
 
-1.0.0-rc.2 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.3 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -271,12 +271,14 @@ polyfills that are only required for specific features.
 
 ## Build Dependencies
 
-dotnet core 2.0 is being used for builds - demandjs.csproj defines all the automation, a sln file is also included
+dotnet core 2.0 is being used for builds - demandjs.csproj defines all the automation, a sln file is also included. 
+
+From the commandline use ```dotnet build``` to transpile / minify everything.
 
 the build depends on several javascript precompilers to transpile to es5 (babel) and minify (closure)
 
-npm install --save-dev babel-cli babel-preset-env
-npm install --save-dev google-closure-compiler
+* npm install --save-dev babel-cli babel-preset-env
+* npm install --save-dev google-closure-compiler
 
 demandjs.debug.js - we build a debug version of the library using babel only, which creates a valid source map to the original source code and transpiles to ES5.
 
@@ -318,6 +320,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.3 - bugfixes
 * 1.0.0-rc.2 - added demand Classes
 * 1.0.0-rc.2 - added ignoreSelector
 * 1.0.0-rc.2 - bugfixes
