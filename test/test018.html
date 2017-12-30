@@ -27,11 +27,13 @@
             var result = document.createElement('div');
             result.innerHTML = '<div>This is default onLoadComplete message</div>';
             document.body.insertBefore(result, document.getElementById('insertBeforeMe'));
+            this.onLoadComplete(t);
           },
           'override': function(t) { 
             var result = document.createElement('div');
             result.innerHTML = '<div>This is override demand class onLoadComplete message</div>';
             document.body.insertBefore(result, document.getElementById('insertBeforeMe'));
+            this.onLoadComplete(t);
           }
         }        
       };

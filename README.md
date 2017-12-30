@@ -104,7 +104,7 @@ A couple of points to notice about this code:
 
   * DemandJS handles all the work of fetching the remote content, the extension code receives the fully loaded resource (passed via the argument `c`) and needs to simply insert it into the DOM.
   * DemandJS pasess the associated `link` element in the argument `t`, and it is expected that the new content is inserted into the DOM relative to the position of that link element.
-  * All standard event handlers will be invoked as usual, and are not something tha needs to be addressed by the extension code.
+  * The demandjs events such as onLoadBegin, onLoadSuccess, etc... will be invoked as usual, and do not need to be addressed by the extension code.
   * It is entirely possible to trigger additional asynchronous behaviors from the extension code via `setTimeout()` or similar, however there is no facility in place within DemandJS to delay completion events or intercept error messages that might occur from downstream async code. (This functionality may become available in the future to extensions that return a promise)
 
 Reference: https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types
@@ -145,7 +145,7 @@ var options = {
 window.DemandJSDemanded = new DemandJS(options);
 ```
 
-Errors can also be captured and handled by passing a custom function as ```onLoadError``` in the options object. This function is expected to do any dom modifications directly as needed. This is the most robust way of configuring error handling, but also comes with the greatest responsibility. Be sure to remove the target node (if you don't want it to be shown in the page).
+Errors can also be captured and handled by passing a custom function as ```onLoadFailure``` in the options object. This function is expected to do any dom modifications directly as needed. This is the most robust way of configuring error handling, but also comes with the greatest responsibility. Be sure to remove the target node (if you don't want it to be shown in the page).
 
 The default implementation is shown below (whic is written using ES6 code:
 
@@ -170,7 +170,7 @@ a simple overload that displays an alert box when each error occurrs (but also p
 
 ```javascript
 var options = {
-	onLoadFailure: function(target, ex){                                                                                                        
+  onLoadFailure: function(target, ex) {
     alert(ex.message);
     this.onLoadFailure(target, ex);
   }
@@ -178,7 +178,22 @@ var options = {
 window.DemandJSDemanded = new DemandJS(options);
 ```
 
-## Demand Classes ##
+## Event Handling
+
+DemandJS provides events for tracking relevant activity. 
+
+```onLoadBegin(t)``` will be invoked when the element ```t``` first scrolls into view and the loading process is initiated. ([see test016](test/test016.html))
+
+```onLoadSuccess(t)``` will be invoked when the element ```t``` finishes loading and is succesfully inserted into the dom. ([see test017](test/test017.html))
+
+```onLoadFailure(t, ex)``` will be invoked when the loading process for element ```t``` fails. The ```ex``` argument contains a javascript ```Error``` containing the details of the failure. The default implementation for this event is responsible for inserting the ```failureHtml``` into the dom.
+ ([see test011](test/test011.html))
+
+```onLoadComplete(t)``` will be invoked when the loading process for element ```t``` is finished, and will be invoked both on success and on failure. ([see test018](test/test018.html))
+
+Each event handler is invoked with 'this' set to the DemandJS instance. A default implementation for each of these events is also defined on the DemandJS object. Unless replacing the default behavior (such as for onLoadFailure()) is the intention, it would be a good idea to also invoke the default implementation of each event handler.
+
+## Demand Classes
 Demand classes enable different content to be configured in different ways without using multiple instances of DemandJS. The most common usage is to display different loading or error animations for different content.
 
 
