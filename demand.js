@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.3 
+/** @preserve DemandJS - v.1.0.0-rc.4 
  *
  * https://github.com/hannasm/demandjs  
  *
@@ -33,7 +33,7 @@
     }
     observeIntersection(intersections) {
       for (var intersect of intersections) {
-        if (!intersect.isIntersecting) { continue; }
+        if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) { continue; }
         let reg = this.phRegistry.get(intersect.target);
         if (reg === undefined || reg.loading) { continue; }
         reg.loading = true;
@@ -523,7 +523,7 @@
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',
         rootMargin: '48px',
-        threshold: 0,
+        threshold: 0.001,
         onLoadBegin: t=>this.onLoadBegin(t),
         onLoadSuccess: t=>this.onLoadSuccess(t),
         onLoadFailure: (t,e)=>this.onLoadFailure(t,e),

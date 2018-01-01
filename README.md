@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.3 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.4 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -320,6 +320,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.4 - threshold == 0 / ratio == 0 leading to elements loading when they are not actually visible
 * 1.0.0-rc.3 - bugfixes
 * 1.0.0-rc.2 - added demand Classes
 * 1.0.0-rc.2 - added ignoreSelector

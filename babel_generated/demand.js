@@ -6,7 +6,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.3 
+/** @preserve DemandJS - v.1.0.0-rc.4 
  *
  * https://github.com/hannasm/demandjs  
  *
@@ -119,7 +119,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           for (var _iterator4 = intersections[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
             var intersect = _step4.value;
 
-            if (!intersect.isIntersecting) {
+            if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) {
               continue;
             }
             var reg = this.phRegistry.get(intersect.target);
@@ -878,7 +878,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',
         rootMargin: '48px',
-        threshold: 0,
+        threshold: 0.001,
         onLoadBegin: function onLoadBegin(t) {
           return _this4.onLoadBegin(t);
         },
