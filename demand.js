@@ -1,6 +1,6 @@
-/** @preserve DemandJS - v.1.0.0-rc.4 
+/** @preserve DemandJS - v.1.0.0-rc.5
  *
- * https://github.com/hannasm/demandjs  
+ * https://github.com/hannasm/demandjs
  *
  **/
 (function (ctx) {
@@ -9,11 +9,16 @@
       for (var mutation of mutations) {
         if (mutation.type !== 'childList') { continue; }
         for (var added of mutation.addedNodes) {
+          // haven't identified why this happens, maybe document.createElement()?
+          if (!added.parentNode) { continue; }
           this.checkAdditionRecursive(added);
         }
       }
     }
     checkAdditionRecursive(added) {
+      if (this.observed.has(added)) { return; }
+      this.observed.set(added, true);
+
       var res = this.isTargetMatch(added);
       if (!res.loaded) {
         if (res.isScript && res.injecting) {
@@ -26,7 +31,10 @@
       } 
 
       if(added.children) {
-        for (var child of added.children) {
+        // modifying collectino while enumerating it leads to bad things so we need to make a copy 
+        // before we do anything else with the children here
+        let children = Array.prototype.slice.call(added.children);
+        for (var child of children) {
           this.checkAdditionRecursive(child);
         }
       }
@@ -76,6 +84,26 @@
     }
     injectLink(target, txt) {
       var {target, registration} = this.resolveTarget(target);
+
+      let previewLoading = this.selectByDemandClass(
+          target, this.options.previewLoading,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          false);
+      // if loading preview requested, never finish loading anything
+      if (previewLoading) { return; }
+
+      let previewFailure = this.selectByDemandClass(
+          target, this.options.previewFailure,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          false);
+      // if error preview requested, treat load success as load errors
+      if (previewFailure) {
+        this.handleError(target, new Error('found failure preview in options'));
+        return;
+      }
+
       var type = registration.extraData.type;
       if (type in this.options.linkHandler) {
         var handler = this.options.linkHandler[type];
@@ -135,6 +163,33 @@
     }
     processSuccess(target) {
       var {target, registration} = this.resolveTarget(target);
+
+      let previewLoading = this.selectByDemandClass(
+          target, this.options.previewLoading,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          false);
+      // if loading preview requested, never finish loading anything
+      if (previewLoading) { return; }
+
+      let previewFailure = this.selectByDemandClass(
+          target, this.options.previewFailure,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          false);
+      // if error preview requested, treat load success as load errors
+      if (previewFailure) {
+        this.handleError(target, new Error('found failure preview in options'));
+        return;
+      }
+
+      // iframe load event being triggered twice
+      if (!registration) { return; }
+
+      if (registration.extraData.insertToLoad) {
+        target.style.display = registration.extraData.display;
+      }
+
       let first = this.options.shouldInsertOnLoad(registration.target);
       for (var placeholder of registration.placeholders) {
         if (first) {
@@ -170,6 +225,10 @@
     }
     handleError(target, ex) {
       var {target, registration} = this.resolveTarget(target);
+
+      // error event being triggered twice
+      if (!registration) { return; }
+
       if (!(ex && ex.stack && ex.message))  {
         if (!ex) {
           ex = new Error("No error was provided on load");
@@ -183,12 +242,16 @@
           this.options.defaultDemandClass,
           this.onLoadFailure);
 
+      if (registration.extraData.insertToLoad) {
+        target.style.display = registration.extraData.display;
+      }
+
       let first = true;
       for (var placeholder of registration.placeholders) {
         if (first) {
           first = false;
           
-          if (!target.parentNode) {
+          if (!target.parentNode || registration.extraData.insertToLoad) {
             placeholder.parentNode.insertBefore(target, placeholder);
           }
 
@@ -336,6 +399,12 @@
           this._restoreTargetInternal(childData.target, childData);
         }
       }
+
+      if (extraData.insertToLoad) {
+        target.style.display = 'none';
+        this.loaded.set(target);
+        document.body.appendChild(target);
+      }
     }
     captureTarget(target, targetRoot) {
       var store = {
@@ -347,10 +416,13 @@
         'hasSizes': target.hasAttribute('sizes'),
         'sizes': target.getAttribute('sizes'),
         'isLink': ('tagName' in target) && (target.tagName.match(/link/i)),
+        'insertToLoad': ('tagName' in target) && (target.tagName.match(/iframe/i)),
         'hasHref': target.hasAttribute('href'),
         'href': target.getAttribute('href'),
         'hasType': target.hasAttribute('type'),
         'type': target.getAttribute('type'),
+        'hasDisplay': target.style && target.style.display,
+        'display': target.style.display || '',
         'children': [],
         'shouldRestore': false,
         'canLoad': false,
@@ -378,7 +450,13 @@
       if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
         store.shouldRestore = true;
         store.canLoad = true;
+        
+       if(  ('tagName' in target) && target.tagName.match(/video|audio/i)) {
+        target.addEventListener('loadedmetadata', evt=>this.processSuccess(targetRoot));
+        target.addEventListener('loadeddata', evt=>this.processSuccess(targetRoot));
+       } else {
         target.addEventListener('load', evt=>this.processSuccess(targetRoot));
+       }
 
         if (store.hasSrcset && store.hasSrc) {
           target.addEventListener('error', evt=>{
@@ -501,6 +579,7 @@
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
       this.injecting = new WeakMap();
+      this.observed = new WeakMap();
 
       let newHandlers = {};
       if (options && 'linkHandler' in options) {
@@ -512,6 +591,8 @@
       this.defaultFailureHtml = '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>';
 
       this.options = Object.assign({
+        previewLoading: false,
+        previewFailure: false,
         demandClassAttribute: 'data-demand',
         defaultDemandClass: 'default',
         loadingHtml: this.defaultLoadingHtml,
@@ -547,13 +628,14 @@
         threshold:this.options.threshold 
       };
       this.intersection = new IntersectionObserver( (a,b)=>this.observeIntersection(a,b), this.intersectionOptions);
-
-      this.observeTargets(this.queryTargets());
+  
+      var targets = this.queryTargets();
+      this.observeTargets(targets);
       this.mutation.observe(document.body, this.mutationOptions);
     }
   }
 
-  window.DemandJS = DemandJS;
+  ctx['DemandJS'] = DemandJS;
 })(window);
 /** @license MIT License
 

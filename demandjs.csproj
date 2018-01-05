@@ -27,7 +27,7 @@
     <JSClosure Include="babel_generated\*.js" />
   </ItemGroup>
   <Target Name="ClosureCompileMinified" AfterTargets="BabelCompile" BeforeTargets="Compile" Inputs="@(JSBabelOutput)" Outputs="demandjs.min.js">
-    <Message Importance="high" Text="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
-    <Exec Command="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
+    <Message Importance="high" Text="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler --rewrite_polyfills=false --compilation_level SIMPLE_OPTIMIZATIONS @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
+    <Exec Command="$(MSBuildProjectDirectory)\node_modules\.bin\google-closure-compiler --rewrite_polyfills=false --compilation_level SIMPLE_OPTIMIZATIONS @(JSBabelOutput -> '--js %(Identity) ', ' ') --js_output_file demandjs.min.js --create_source_map demandjs.min.js.map" />
   </Target>
 </Project>

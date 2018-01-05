@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.4 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.5 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -15,7 +15,11 @@ Loading resources on demand can drastically reduce initial page load times and p
 
 * It is important that your loading elements are approximately the same dimensions as your actual content. DemandJS replaces your actual content with loading elements (e.g. loading anmiation). When the loading element becomes visible on the page, demandjs will begin loading your actual content. If the loading element is significantly smaller than the actual content, and several are clumped together in the layout, loading may start earlier than was actually needed. If your loading elements are significantly larger than your actual content, and several are clumped together, inserting your actual content into the page may lead to other loading elements popping into view, and hence additional loads happening later than intended.
 
+* Dont use styles directly on your media elements to control visibilty. Any styles applied directly to your media elements will not also be applied to the loading and failure ui. The intention of the loading ui in particular is to identify when the user can see the media and when loading needs to begin. If you are directly styling your media elements to hide them loading will probably begin prematurely (because the loading ui is visible), and loading graphics will be visible in the page when they shouldn't be.
+
 * In the default configuration, demandjs will ignore any elements with the 'nodemand' class. You may also use the ```ignoreSelector``` option to customize which elements are ignored. ([see test020](test/test020.html))
+
+* Use the ```previewLoading:true``` and ```previewFailure:true``` options during testing / development to make sure that your loading and failure ui looks good and works the way you want it those
 
 ## Usage
 
@@ -233,28 +237,32 @@ Demand classes are supported for all of the following options:
   * onLoadSuccess ([see test017](test/test017.html))
   * onLoadComplete ([see test018](test/test018.html))
   * onLoadFailure ([see test019](test/test019.html))
+  * previewLoading
+  * previewFailure
 
 ## Configuration
 
   The DemandJS constructor accepts a single argument, which is the options collection. 
 
-  | Field                  | Description | Default |
-  |------------------------|-------------|---------|
-  | demandClassAttribute   | This option specifies the attribute used to lookup the demand class on each element | data-demand |
-  | defaultDemandClass     | This option specifies the demand class that is used if no demand class is specified | default |
-  | loadingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` |
-  | createLoadingNode      | ```function(target){}``` This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified |
-  | failureHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` |
-  | createFailureNode     | ```function(target,error){}``` This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a standard javascript 'Error'. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that will be inserted into the DOM automatically. | Defines a functor to creating the `failureHtml` |
-  | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. You may use the full selector syntax (see https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors)  | `img,video,picture,iframe,link.demand` |
-  | ignoreSelector       | This is a css selector, defining elements which should be ignored by demandjs. This is evaluated after the selector is evaluated (so when possible prefer using that) to exclude certain elements from demand loading behaviors. You may use the full selector syntax (see: https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors) | .nodemand |
-  | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `48px` |
-  | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the loading element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` |
-  | onLoadBegin            | `function(target) {}` - this is called each time an element begins loading, the element is passed as an argument  | noop |
-  | onLoadSuccess              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop |
-  | onLoadFailure              | `function(target, exception) {}` - this is called each time loading fails with error, the element that was loading is passed as the argument 'target'. 'exception' details which will be of type Error.  | noop |
-  | onLoadComplete              | `function(target) {}` - this is called each time loading completes, both for error and success, the element is passed as an argument  | noop |
-  | linkHandler                 | this is a collection of (key,value) pairs where key is a mime-type (string) and value is a function (target, content) to be invoked when a link element with `type="(contentType)"` is loaded | handlers for mime types `text/html` and `application/xhtml+xml` are available by default |
+  | Field                  | Description | Default | Supports Demand Classes |
+  |------------------------|-------------|---------|-------------------------|
+  | demandClassAttribute   | This option specifies the attribute used to lookup the demand class on each element | data-demand | no |
+  | defaultDemandClass     | This option specifies the demand class that is used if no demand class is specified | default | no |
+  | loadingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` | yes |
+  | createLoadingNode      | ```function(target){}``` This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified | yes |
+  | failureHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` | yes |
+  | createFailureNode     | ```function(target,error){}``` This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a standard javascript 'Error'. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that will be inserted into the DOM automatically. | Defines a functor to creating the `failureHtml` | yes |
+  | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. You may use the full selector syntax (see https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors)  | `img,video,picture,iframe,link.demand` | no |
+  | ignoreSelector       | This is a css selector, defining elements which should be ignored by demandjs. This is evaluated after the selector is evaluated (so when possible prefer using that) to exclude certain elements from demand loading behaviors. You may use the full selector syntax (see: https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors) | .nodemand | no |
+  | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `48px` | no |
+  | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the loading element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` | no |
+  | onLoadBegin            | `function(target) {}` - this is called each time an element begins loading, the element is passed as an argument  | noop | yes |
+  | onLoadSuccess              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop | yes |
+  | onLoadFailure              | `function(target, exception) {}` - this is called each time loading fails with error, the element that was loading is passed as the argument 'target'. 'exception' details which will be of type Error.  | noop | yes |
+  | onLoadComplete              | `function(target) {}` - this is called each time loading completes, both for error and success, the element is passed as an argument  | noop | yes |
+  | linkHandler                 | this is a collection of (key,value) pairs where key is a mime-type (string) and value is a function (target, content) to be invoked when a link element with `type="(contentType)"` is loaded | handlers for mime types `text/html` and `application/xhtml+xml` are available by default | no |
+  | previewLoading            | When set to true, loading will never complete. loadingHtml or whatever loading ui is being used will be displayed indefinitley | false | yes |
+  | previewFailure            | When set to true, loading will always continue as normal, but fail at the time it would normally succeed. failureHtml or whatever failure ui is being used will be displayed for all elements | false | yes |
 
 
 ## Polyfill Dependencies
@@ -320,6 +328,8 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.5 - bugfixes
+* 1.0.0-rc.5 - added options for previewLoading / previewFailure 
 * 1.0.0-rc.4 - threshold == 0 / ratio == 0 leading to elements loading when they are not actually visible
 * 1.0.0-rc.3 - bugfixes
 * 1.0.0-rc.2 - added demand Classes

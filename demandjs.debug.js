@@ -6,9 +6,9 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.4 
+/** @preserve DemandJS - v.1.0.0-rc.5
  *
- * https://github.com/hannasm/demandjs  
+ * https://github.com/hannasm/demandjs
  *
  **/
 (function (ctx) {
@@ -35,6 +35,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               for (var _iterator2 = mutation.addedNodes[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
                 var added = _step2.value;
 
+                // haven't identified why this happens, maybe document.createElement()?
+                if (!added.parentNode) {
+                  continue;
+                }
                 this.checkAdditionRecursive(added);
               }
             } catch (err) {
@@ -70,6 +74,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'checkAdditionRecursive',
       value: function checkAdditionRecursive(added) {
+        if (this.observed.has(added)) {
+          return;
+        }
+        this.observed.set(added, true);
+
         var res = this.isTargetMatch(added);
         if (!res.loaded) {
           if (res.isScript && res.injecting) {
@@ -82,12 +91,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         if (added.children) {
+          // modifying collectino while enumerating it leads to bad things so we need to make a copy 
+          // before we do anything else with the children here
+          var children = Array.prototype.slice.call(added.children);
           var _iteratorNormalCompletion3 = true;
           var _didIteratorError3 = false;
           var _iteratorError3 = undefined;
 
           try {
-            for (var _iterator3 = added.children[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+            for (var _iterator3 = children[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
               var child = _step3.value;
 
               this.checkAdditionRecursive(child);
@@ -191,6 +203,19 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var _resolveTarget2 = this.resolveTarget(target),
             target = _resolveTarget2.target,
             registration = _resolveTarget2.registration;
+
+        var previewLoading = this.selectByDemandClass(target, this.options.previewLoading, this.options.demandClassAttribute, this.options.defaultDemandClass, false);
+        // if loading preview requested, never finish loading anything
+        if (previewLoading) {
+          return;
+        }
+
+        var previewFailure = this.selectByDemandClass(target, this.options.previewFailure, this.options.demandClassAttribute, this.options.defaultDemandClass, false);
+        // if error preview requested, treat load success as load errors
+        if (previewFailure) {
+          this.handleError(target, new Error('found failure preview in options'));
+          return;
+        }
 
         var type = registration.extraData.type;
         if (type in this.options.linkHandler) {
@@ -308,6 +333,28 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             target = _resolveTarget3.target,
             registration = _resolveTarget3.registration;
 
+        var previewLoading = this.selectByDemandClass(target, this.options.previewLoading, this.options.demandClassAttribute, this.options.defaultDemandClass, false);
+        // if loading preview requested, never finish loading anything
+        if (previewLoading) {
+          return;
+        }
+
+        var previewFailure = this.selectByDemandClass(target, this.options.previewFailure, this.options.demandClassAttribute, this.options.defaultDemandClass, false);
+        // if error preview requested, treat load success as load errors
+        if (previewFailure) {
+          this.handleError(target, new Error('found failure preview in options'));
+          return;
+        }
+
+        // iframe load event being triggered twice
+        if (!registration) {
+          return;
+        }
+
+        if (registration.extraData.insertToLoad) {
+          target.style.display = registration.extraData.display;
+        }
+
         var first = this.options.shouldInsertOnLoad(registration.target);
         var _iteratorNormalCompletion7 = true;
         var _didIteratorError7 = false;
@@ -366,6 +413,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             target = _resolveTarget4.target,
             registration = _resolveTarget4.registration;
 
+        // error event being triggered twice
+
+
+        if (!registration) {
+          return;
+        }
+
         if (!(ex && ex.stack && ex.message)) {
           if (!ex) {
             ex = new Error("No error was provided on load");
@@ -374,6 +428,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }
         }
         var onLoadFailure = this.selectByDemandClass(target, this.options.onLoadFailure, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadFailure);
+
+        if (registration.extraData.insertToLoad) {
+          target.style.display = registration.extraData.display;
+        }
 
         var first = true;
         var _iteratorNormalCompletion8 = true;
@@ -387,7 +445,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             if (first) {
               first = false;
 
-              if (!target.parentNode) {
+              if (!target.parentNode || registration.extraData.insertToLoad) {
                 placeholder.parentNode.insertBefore(target, placeholder);
               }
 
@@ -581,6 +639,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             this._restoreTargetInternal(childData.target, childData);
           }
         }
+
+        if (extraData.insertToLoad) {
+          target.style.display = 'none';
+          this.loaded.set(target);
+          document.body.appendChild(target);
+        }
       }
     }, {
       key: 'captureTarget',
@@ -596,10 +660,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           'hasSizes': target.hasAttribute('sizes'),
           'sizes': target.getAttribute('sizes'),
           'isLink': 'tagName' in target && target.tagName.match(/link/i),
+          'insertToLoad': 'tagName' in target && target.tagName.match(/iframe/i),
           'hasHref': target.hasAttribute('href'),
           'href': target.getAttribute('href'),
           'hasType': target.hasAttribute('type'),
           'type': target.getAttribute('type'),
+          'hasDisplay': target.style && target.style.display,
+          'display': target.style.display || '',
           'children': [],
           'shouldRestore': false,
           'canLoad': false,
@@ -626,9 +693,19 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
           store.shouldRestore = true;
           store.canLoad = true;
-          target.addEventListener('load', function (evt) {
-            return _this3.processSuccess(targetRoot);
-          });
+
+          if ('tagName' in target && target.tagName.match(/video|audio/i)) {
+            target.addEventListener('loadedmetadata', function (evt) {
+              return _this3.processSuccess(targetRoot);
+            });
+            target.addEventListener('loadeddata', function (evt) {
+              return _this3.processSuccess(targetRoot);
+            });
+          } else {
+            target.addEventListener('load', function (evt) {
+              return _this3.processSuccess(targetRoot);
+            });
+          }
 
           if (store.hasSrcset && store.hasSrc) {
             target.addEventListener('error', function (evt) {
@@ -848,6 +925,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.phRegistry = new WeakMap();
       this.loaded = new WeakMap();
       this.injecting = new WeakMap();
+      this.observed = new WeakMap();
 
       var newHandlers = {};
       if (options && 'linkHandler' in options) {
@@ -859,6 +937,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.defaultFailureHtml = '<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>';
 
       this.options = Object.assign({
+        previewLoading: false,
+        previewFailure: false,
         demandClassAttribute: 'data-demand',
         defaultDemandClass: 'default',
         loadingHtml: this.defaultLoadingHtml,
@@ -919,14 +999,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         return _this4.observeIntersection(a, b);
       }, this.intersectionOptions);
 
-      this.observeTargets(this.queryTargets());
+      var targets = this.queryTargets();
+      this.observeTargets(targets);
       this.mutation.observe(document.body, this.mutationOptions);
     }
 
     return DemandJS;
   }();
 
-  window.DemandJS = DemandJS;
+  ctx['DemandJS'] = DemandJS;
 })(window);
 /** @license MIT License
 
