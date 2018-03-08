@@ -16,58 +16,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     _createClass(DemandJS, [{
       key: 'observeMutation',
       value: function observeMutation(mutations) {
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = mutations[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var mutation = _step.value;
-
-            if (mutation.type !== 'childList') {
+        for (var i = 0; i < mutations.length; i++) {
+          var mutation = mutations[i];
+          if (mutation.type !== 'childList') {
+            continue;
+          }
+          for (var j = 0; j < mutation.addedNodes.length; j++) {
+            var added = mutation.addedNodes[j];
+            // haven't identified why this happens, maybe document.createElement()?
+            if (!added.parentNode) {
               continue;
             }
-            var _iteratorNormalCompletion2 = true;
-            var _didIteratorError2 = false;
-            var _iteratorError2 = undefined;
-
-            try {
-              for (var _iterator2 = mutation.addedNodes[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                var added = _step2.value;
-
-                // haven't identified why this happens, maybe document.createElement()?
-                if (!added.parentNode) {
-                  continue;
-                }
-                this.checkAdditionRecursive(added);
-              }
-            } catch (err) {
-              _didIteratorError2 = true;
-              _iteratorError2 = err;
-            } finally {
-              try {
-                if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                  _iterator2.return();
-                }
-              } finally {
-                if (_didIteratorError2) {
-                  throw _iteratorError2;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
+            this.checkAdditionRecursive(added);
           }
         }
       }
@@ -94,66 +54,26 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           // modifying collectino while enumerating it leads to bad things so we need to make a copy 
           // before we do anything else with the children here
           var children = Array.prototype.slice.call(added.children);
-          var _iteratorNormalCompletion3 = true;
-          var _didIteratorError3 = false;
-          var _iteratorError3 = undefined;
-
-          try {
-            for (var _iterator3 = children[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-              var child = _step3.value;
-
-              this.checkAdditionRecursive(child);
-            }
-          } catch (err) {
-            _didIteratorError3 = true;
-            _iteratorError3 = err;
-          } finally {
-            try {
-              if (!_iteratorNormalCompletion3 && _iterator3.return) {
-                _iterator3.return();
-              }
-            } finally {
-              if (_didIteratorError3) {
-                throw _iteratorError3;
-              }
-            }
+          for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            this.checkAdditionRecursive(child);
           }
         }
       }
     }, {
       key: 'observeIntersection',
       value: function observeIntersection(intersections) {
-        var _iteratorNormalCompletion4 = true;
-        var _didIteratorError4 = false;
-        var _iteratorError4 = undefined;
-
-        try {
-          for (var _iterator4 = intersections[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
-            var intersect = _step4.value;
-
-            if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) {
-              continue;
-            }
-            var reg = this.phRegistry.get(intersect.target);
-            if (reg === undefined || reg.loading) {
-              continue;
-            }
-            reg.loading = true;
-            this.beginLoad(reg);
+        for (var i = 0; i < intersections.length; i++) {
+          var intersect = intersections[i];
+          if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) {
+            continue;
           }
-        } catch (err) {
-          _didIteratorError4 = true;
-          _iteratorError4 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion4 && _iterator4.return) {
-              _iterator4.return();
-            }
-          } finally {
-            if (_didIteratorError4) {
-              throw _iteratorError4;
-            }
+          var reg = this.phRegistry.get(intersect.target);
+          if (reg === undefined || reg.loading) {
+            continue;
           }
+          reg.loading = true;
+          this.beginLoad(reg);
         }
       }
     }, {
@@ -272,57 +192,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var bodies = root.getElementsByTagName('body');
         var injectionId = 1;
         bodies = Array.prototype.slice.call(bodies);
-        var _iteratorNormalCompletion5 = true;
-        var _didIteratorError5 = false;
-        var _iteratorError5 = undefined;
-
-        try {
-          for (var _iterator5 = bodies[Symbol.iterator](), _step5; !(_iteratorNormalCompletion5 = (_step5 = _iterator5.next()).done); _iteratorNormalCompletion5 = true) {
-            var body = _step5.value;
-
-            var clds = Array.prototype.slice.call(body.children);
-            var _iteratorNormalCompletion6 = true;
-            var _didIteratorError6 = false;
-            var _iteratorError6 = undefined;
-
-            try {
-              for (var _iterator6 = clds[Symbol.iterator](), _step6; !(_iteratorNormalCompletion6 = (_step6 = _iterator6.next()).done); _iteratorNormalCompletion6 = true) {
-                var bc = _step6.value;
-
-                this.injecting.set(bc, {
-                  href: target.href,
-                  id: injectionId
-                });
-                injectionId += 1;
-                target.parentNode.insertBefore(bc, target);
-              }
-            } catch (err) {
-              _didIteratorError6 = true;
-              _iteratorError6 = err;
-            } finally {
-              try {
-                if (!_iteratorNormalCompletion6 && _iterator6.return) {
-                  _iterator6.return();
-                }
-              } finally {
-                if (_didIteratorError6) {
-                  throw _iteratorError6;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          _didIteratorError5 = true;
-          _iteratorError5 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion5 && _iterator5.return) {
-              _iterator5.return();
-            }
-          } finally {
-            if (_didIteratorError5) {
-              throw _iteratorError5;
-            }
+        for (var i = 0; i < bodies.length; i++) {
+          var body = bodies[i];
+          var clds = Array.prototype.slice.call(body.children);
+          for (var j = 0; j < clds.length; j++) {
+            var bc = clds[j];
+            this.injecting.set(bc, {
+              href: target.href,
+              id: injectionId
+            });
+            injectionId += 1;
+            target.parentNode.insertBefore(bc, target);
           }
         }
       }
@@ -356,35 +236,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         var first = this.options.shouldInsertOnLoad(registration.target);
-        var _iteratorNormalCompletion7 = true;
-        var _didIteratorError7 = false;
-        var _iteratorError7 = undefined;
-
-        try {
-          for (var _iterator7 = registration.placeholders[Symbol.iterator](), _step7; !(_iteratorNormalCompletion7 = (_step7 = _iterator7.next()).done); _iteratorNormalCompletion7 = true) {
-            var placeholder = _step7.value;
-
-            if (first) {
-              first = false;
-              placeholder.parentNode.insertBefore(registration.target, placeholder);
-            }
-            this.cleanupPlaceholder(placeholder);
+        for (var i = 0; i < registration.placeholders.length; i++) {
+          var placeholder = registration.placeholders[i];
+          if (first) {
+            first = false;
+            placeholder.parentNode.insertBefore(registration.target, placeholder);
           }
-        } catch (err) {
-          _didIteratorError7 = true;
-          _iteratorError7 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion7 && _iterator7.return) {
-              _iterator7.return();
-            }
-          } finally {
-            if (_didIteratorError7) {
-              throw _iteratorError7;
-            }
-          }
+          this.cleanupPlaceholder(placeholder);
         }
-
         this.cleanupRegistrationTarget(registration);
 
         var onLoadSuccess = this.selectByDemandClass(target, this.options.onLoadSuccess, this.options.demandClassAttribute, this.options.defaultDemandClass, this.onLoadSuccess);
@@ -434,40 +293,19 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         var first = true;
-        var _iteratorNormalCompletion8 = true;
-        var _didIteratorError8 = false;
-        var _iteratorError8 = undefined;
+        for (var i = 0; i < registration.placeholders.length; i++) {
+          var placeholder = registration.placeholders[i];
+          if (first) {
+            first = false;
 
-        try {
-          for (var _iterator8 = registration.placeholders[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
-            var placeholder = _step8.value;
-
-            if (first) {
-              first = false;
-
-              if (!target.parentNode || registration.extraData.insertToLoad) {
-                placeholder.parentNode.insertBefore(target, placeholder);
-              }
-
-              onLoadFailure.call(this, target, ex);
+            if (!target.parentNode || registration.extraData.insertToLoad) {
+              placeholder.parentNode.insertBefore(target, placeholder);
             }
-            this.cleanupPlaceholder(placeholder);
+
+            onLoadFailure.call(this, target, ex);
           }
-        } catch (err) {
-          _didIteratorError8 = true;
-          _iteratorError8 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion8 && _iterator8.return) {
-              _iterator8.return();
-            }
-          } finally {
-            if (_didIteratorError8) {
-              throw _iteratorError8;
-            }
-          }
+          this.cleanupPlaceholder(placeholder);
         }
-
         if (first) {
           onLoadFailure.call(this, target, ex);
         }
@@ -497,34 +335,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var createFailureNode = this.selectByDemandClass(target, this.options.createFailureNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createFailureNode);
         var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
-        var _iteratorNormalCompletion9 = true;
-        var _didIteratorError9 = false;
-        var _iteratorError9 = undefined;
+        for (var i = 0; i < errorUI.length; i++) {
+          var eui = errorUI[i];
+          // register placeholders so if they contain media we dont try to demand load them...
+          this.loaded.set(eui, true);
 
-        try {
-          for (var _iterator9 = errorUI[Symbol.iterator](), _step9; !(_iteratorNormalCompletion9 = (_step9 = _iterator9.next()).done); _iteratorNormalCompletion9 = true) {
-            var eui = _step9.value;
-
-            // register placeholders so if they contain media we dont try to demand load them...
-            this.loaded.set(eui, true);
-
-            target.parentNode.insertBefore(eui, target);
-          }
-        } catch (err) {
-          _didIteratorError9 = true;
-          _iteratorError9 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion9 && _iterator9.return) {
-              _iterator9.return();
-            }
-          } finally {
-            if (_didIteratorError9) {
-              throw _iteratorError9;
-            }
-          }
+          target.parentNode.insertBefore(eui, target);
         }
-
         if (this.options.shouldRemove(target)) {
           target.parentNode.removeChild(target);
         }
@@ -777,35 +594,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           var placeholders = createLoadingNode.call(this, target);
           placeholders = Array.prototype.slice.call(placeholders);
 
-          var _iteratorNormalCompletion10 = true;
-          var _didIteratorError10 = false;
-          var _iteratorError10 = undefined;
-
-          try {
-            for (var _iterator10 = placeholders[Symbol.iterator](), _step10; !(_iteratorNormalCompletion10 = (_step10 = _iterator10.next()).done); _iteratorNormalCompletion10 = true) {
-              var placeholder = _step10.value;
-
-              this.registerPlaceholder(placeholder, target, placeholders, store);
-              // register placeholders so if they contain media we dont try to demand load them...
-              this.loaded.set(placeholder, true);
-              target.parentNode.insertBefore(placeholder, target);
-              this.intersection.observe(placeholder);
-            }
-          } catch (err) {
-            _didIteratorError10 = true;
-            _iteratorError10 = err;
-          } finally {
-            try {
-              if (!_iteratorNormalCompletion10 && _iterator10.return) {
-                _iterator10.return();
-              }
-            } finally {
-              if (_didIteratorError10) {
-                throw _iteratorError10;
-              }
-            }
+          for (var i = 0; i < placeholders.length; i++) {
+            var placeholder = placeholders[i];
+            this.registerPlaceholder(placeholder, target, placeholders, store);
+            // register placeholders so if they contain media we dont try to demand load them...
+            this.loaded.set(placeholder, true);
+            target.parentNode.insertBefore(placeholder, target);
+            this.intersection.observe(placeholder);
           }
-
           this.registerPlaceholder(target, target, placeholders, store);
           if (this.options.shouldRemove(target)) {
             target.parentNode.removeChild(target);
@@ -817,29 +613,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'observeTargets',
       value: function observeTargets(targets) {
-        var _iteratorNormalCompletion11 = true;
-        var _didIteratorError11 = false;
-        var _iteratorError11 = undefined;
-
-        try {
-          for (var _iterator11 = targets[Symbol.iterator](), _step11; !(_iteratorNormalCompletion11 = (_step11 = _iterator11.next()).done); _iteratorNormalCompletion11 = true) {
-            var target = _step11.value;
-
-            this.observeTarget(target);
-          }
-        } catch (err) {
-          _didIteratorError11 = true;
-          _iteratorError11 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion11 && _iterator11.return) {
-              _iterator11.return();
-            }
-          } finally {
-            if (_didIteratorError11) {
-              throw _iteratorError11;
-            }
-          }
+        for (var i = 0; i < targets.length; i++) {
+          var target = targets[i];
+          this.observeTarget(target);
         }
       }
     }, {
@@ -880,34 +656,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'queryTargets',
       value: function queryTargets() {
         var result = [];
-        var _iteratorNormalCompletion12 = true;
-        var _didIteratorError12 = false;
-        var _iteratorError12 = undefined;
-
-        try {
-          for (var _iterator12 = document.querySelectorAll(this.options.selector)[Symbol.iterator](), _step12; !(_iteratorNormalCompletion12 = (_step12 = _iterator12.next()).done); _iteratorNormalCompletion12 = true) {
-            var node = _step12.value;
-
-            if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) {
-              continue;
-            }
-            result.push(node);
+        var nodes = document.querySelectorAll(this.options.selector);
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) {
+            continue;
           }
-        } catch (err) {
-          _didIteratorError12 = true;
-          _iteratorError12 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion12 && _iterator12.return) {
-              _iterator12.return();
-            }
-          } finally {
-            if (_didIteratorError12) {
-              throw _iteratorError12;
-            }
-          }
+          result.push(node);
         }
-
         return result;
       }
     }, {

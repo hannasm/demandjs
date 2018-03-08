@@ -6,9 +6,11 @@
 (function (ctx) {
   class DemandJS {
     observeMutation(mutations) {
-      for (var mutation of mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var mutation = mutations[i];
         if (mutation.type !== 'childList') { continue; }
-        for (var added of mutation.addedNodes) {
+        for (var j = 0; j < mutation.addedNodes.length; j++) {
+          var added = mutation.addedNodes[j];
           // haven't identified why this happens, maybe document.createElement()?
           if (!added.parentNode) { continue; }
           this.checkAdditionRecursive(added);
@@ -34,13 +36,15 @@
         // modifying collectino while enumerating it leads to bad things so we need to make a copy 
         // before we do anything else with the children here
         let children = Array.prototype.slice.call(added.children);
-        for (var child of children) {
+        for (var i = 0; i < children.length; i++) {
+          var child = children[i];
           this.checkAdditionRecursive(child);
         }
       }
     }
     observeIntersection(intersections) {
-      for (var intersect of intersections) {
+      for (var i = 0; i < intersections.length; i++) {
+        var intersect = intersections[i];
         if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) { continue; }
         let reg = this.phRegistry.get(intersect.target);
         if (reg === undefined || reg.loading) { continue; }
@@ -149,9 +153,11 @@
       var bodies = root.getElementsByTagName('body');
       let injectionId = 1;
       bodies = Array.prototype.slice.call(bodies);
-      for (var body of bodies) {
+      for (var i = 0; i< bodies.length; i++) {
+        var body = bodies[i];
         var clds = Array.prototype.slice.call(body.children);
-        for (var bc of clds) {
+        for (var j = 0; j < clds.length; j++) {
+          var bc = clds[j];
           this.injecting.set(bc, {
             href: target.href,
             id: injectionId 
@@ -191,7 +197,8 @@
       }
 
       let first = this.options.shouldInsertOnLoad(registration.target);
-      for (var placeholder of registration.placeholders) {
+      for (var i = 0; i < registration.placeholders.length; i++) {
+        var placeholder = registration.placeholders[i];
         if (first) {
           first = false;
           placeholder.parentNode.insertBefore(registration.target, placeholder);
@@ -247,7 +254,8 @@
       }
 
       let first = true;
-      for (var placeholder of registration.placeholders) {
+      for (var i = 0; i < registration.placeholders.length; i++) {
+        var placeholder = registration.placeholders[i];
         if (first) {
           first = false;
           
@@ -288,7 +296,8 @@
             this.createFailureNode);
         var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
-        for (var eui of errorUI) {
+        for (var i = 0; i < errorUI.length; i++) {
+          var eui = errorUI[i];
           // register placeholders so if they contain media we dont try to demand load them...
           this.loaded.set(eui, true); 
 
@@ -518,7 +527,8 @@
         var placeholders = createLoadingNode.call(this, target);
         placeholders = Array.prototype.slice.call(placeholders);
 
-        for (var placeholder of placeholders) {
+        for (var i = 0; i < placeholders.length; i++) {
+          var placeholder = placeholders[i];
           this.registerPlaceholder(placeholder, target, placeholders, store);
           // register placeholders so if they contain media we dont try to demand load them...
           this.loaded.set(placeholder, true); 
@@ -534,7 +544,8 @@
       }
     }
     observeTargets(targets) {
-      for (var target of targets) {
+      for (var i = 0; i < targets.length; i++) {
+        var target = targets[i];
         this.observeTarget(target);
       }
     }
@@ -566,7 +577,9 @@
     }
     queryTargets() {
       let result = [];
-      for (var node of document.querySelectorAll(this.options.selector)) {
+      var nodes = document.querySelectorAll(this.options.selector);
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
         if (this.options.ignoreSelector && 'matches' in node && node.matches(this.options.ignoreSelector)) { continue; }
         result.push(node);
       }
