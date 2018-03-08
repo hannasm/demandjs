@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.5 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.6 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -328,6 +328,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.6 - remove all for..of loops because they dont work in ie / edge and no polyfill is available so this was an easier solution
 * 1.0.0-rc.5 - bugfixes
 * 1.0.0-rc.5 - added options for previewLoading / previewFailure 
 * 1.0.0-rc.4 - threshold == 0 / ratio == 0 leading to elements loading when they are not actually visible

@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.5
+/** @preserve DemandJS - v.1.0.0-rc.6
  *
  * https://github.com/hannasm/demandjs
  *
