@@ -1,0 +1,22 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {
+        document.write('<img src="' + window.test_images[i] + '" /><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var djs = new DemandJS({
+        alternatives: [
+          [ 'https://md.rsndev.com:2020/',
+            'https://images.unsplash.com/' ]
+        ]
+      });
+    </script>
+  </body>
+</html>

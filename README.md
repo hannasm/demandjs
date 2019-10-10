@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.6 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.7 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Overview
 
@@ -240,6 +240,65 @@ Demand classes are supported for all of the following options:
   * previewLoading
   * previewFailure
 
+## Load Balancing
+
+DemandJS supports load balancing of resources across multiple domains. This can be useful for serving the same files from multiple regions or simply providing high availability or fault tolerance. The load balancer measures response times and response status from each server and attempts to send requests to servers that are responding succesfully and quickly. 
+
+The load balancer is configured using url prefix groupings. It is assumed that for a single grouping, any url prefix in that grouping is interchangeable with any other. The first matching grouping found will be used for each resource.
+
+```javascript
+var options = {
+ alternatives: [
+    [ 'http://img1.somesite.com/', 'http://img2.somesite.com/' ],
+    [ 'http://somesite.com/static/', 'http://img3.somesite.com/' ]
+  ]
+};
+```
+
+This sample configuration defines two groupings. The first grouping would match any resources to urls for http://img1.somesite.com or http://img2.somesite.com. Any resource that is affected by demandjs and starts with either of these url prefixes could potentially end up being requested to either of those addresses. The second grouping matches http://somesite.com/static/ and http://img3.somesite.com and the same rules apply, any resources thet start with either prefix could end up being requested from any of the urls.
+
+```javascript
+var options = {
+  alternatives: [ /* setup url prefix groups here */ ],
+  defaultFileSize: 1024 * 512
+};
+```
+
+The extra configuration option for defaultFileSize is used to guess at approximately how much data might have been transferred when the browser denies demandjs access to that information for security reasons. It is very common for this information to be denied due to CORS restrictions and picking an appropriate value here that represents your average file size can help with accuracy of the load balancing. 
+
+## Retry
+
+DemandJS supports retrying failed requests. Retry can work alongside the load balancer to pick different servers after failed requests and facilitate high-availability of page resources. 
+
+Retry uses an exponential backoff delay to help minimize frivolous network chatter when resources are clearly inaccessible or otherwise unavailable.
+
+Retry can be enabled or disabled with the `retryOnError` option.
+
+```javascript
+var options = {
+  retryOnError: true,
+  maxRetries: 2
+};
+```
+
+## *Experimental* Resource Offloading
+
+Resource offloading is a matter of removing images / other demand loaded elements from the page when they are no longer within view and are unneeded. This can help low resource mobile devices and tablets view pages with lots of content.
+
+While implementing this feature there seemed to be a lot of issues with browser scrolling in chrome. Inserting / removing elements caused the scrollbar to jump around haphazardly. A workaround was to save the scroll position / remove the element / reinstate the scroll position, but this still results in some uncomfortable jitter in the page.
+
+This hasn't been tested in other browsers yet and is disabled by default, but available in it's current form for further experimentation to take place and other browser issues to be identified and investigated.
+
+```javascript
+var options = {
+  enableOffloading: true,
+  rootMarginOuter: '2048px',
+  thresholdOuter: 0.001
+};
+```
+
+See the configuration section below for further details.
+
 ## Configuration
 
   The DemandJS constructor accepts a single argument, which is the options collection. 
@@ -254,7 +313,7 @@ Demand classes are supported for all of the following options:
   | createFailureNode     | ```function(target,error){}``` This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a standard javascript 'Error'. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that will be inserted into the DOM automatically. | Defines a functor to creating the `failureHtml` | yes |
   | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. You may use the full selector syntax (see https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors)  | `img,video,picture,iframe,link.demand` | no |
   | ignoreSelector       | This is a css selector, defining elements which should be ignored by demandjs. This is evaluated after the selector is evaluated (so when possible prefer using that) to exclude certain elements from demand loading behaviors. You may use the full selector syntax (see: https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors) | .nodemand | no |
-  | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `48px` | no |
+  | rootMargin           | This defines the margin around the viewport that is considered 'in-view'. Can have values similar to the CSS margin property e.g. `10px 20px 30px 40px` | `256px` | no |
   | threshold            | Defines the percentage between 0 (any %) and 1 (100%) the loading element must be visible before the image begins loading. The intersection observer API supports multiple threshold levels, however DemandJS only is going to do anything meaningful with the lowest specified threshold. Actual loading is also affected by the `rootMargin` property as well. | `0` | no |
   | onLoadBegin            | `function(target) {}` - this is called each time an element begins loading, the element is passed as an argument  | noop | yes |
   | onLoadSuccess              | `function(target) {}` - this is called each time an element completes loading, the element is passed as an argument  | noop | yes |
@@ -263,6 +322,14 @@ Demand classes are supported for all of the following options:
   | linkHandler                 | this is a collection of (key,value) pairs where key is a mime-type (string) and value is a function (target, content) to be invoked when a link element with `type="(contentType)"` is loaded | handlers for mime types `text/html` and `application/xhtml+xml` are available by default | no |
   | previewLoading            | When set to true, loading will never complete. loadingHtml or whatever loading ui is being used will be displayed indefinitley | false | yes |
   | previewFailure            | When set to true, loading will always continue as normal, but fail at the time it would normally succeed. failureHtml or whatever failure ui is being used will be displayed for all elements | false | yes |
+  | defaultFileSize | This should be an average or over prediction of file sizes being loaded, will be used in cases where the filesize is not able to be detected through javascript | 512 * 1024 = 52488 bytes | yes | 
+  | alternatives | an array defining a set of urls which are interchangeable by prefix. this should be an array of arrays, where each sub array contains a url prefixes which can be swapped on loadable dom elements. demandjs will match any demand loaded link in the page to the first sub-array found that contains a matching prefix. demandjs will load balance requests across the collection of urls based on a load balancing algorithm, and retry on different urls if failures are ocurring on on some urls | {} | no | 
+  | maxPerformanceRecords | defines the number of requests to average over for calculating load balancer predictions, a larger number will be less forgiving to slow servers | 7 | no |
+  | retryOnError | when set to true, attempt to retry failed requests instead of giving up | true | yes |
+  | maxRetries | maximum number of times to retry before giving up | 2 | yes |
+  | enableOffloading | when true, enables an experimental feature which removes demand loaded resources from the DOM when they are scrolled sufficiently out of view, allowing browser garbage collection. This functionality is still experimental | false | no |
+  | rootMarginOuter | similar to root margin but defines the region outside of which elements are offloaded. this should be significantly larger the rootMargin, but ideal settings aren't quite clear yet | 2048px | no |
+  | thresholdOuter | similar to threshold but defines the visibility threshold outside of which elements are offloaded | 0.001 | no |
 
 
 ## Polyfill Dependencies
@@ -325,9 +392,16 @@ It should be fairly easy to make assertions using some combination of properties
 * [test018](test/test018.html)
 * [test019](test/test019.html)
 * [test020](test/test020.html)
+* [test021](test/test021.html)
+* [test022](test/test022.html)
 
 ## Release Notes 
 
+* 1.0.0-rc.7 - retry on failed requests, potentially using load balacning to attepmt alternative urls, with exponential backoff delays
+* 1.0.0-rc.7 - add ability to setup load balancing of requests across multiple domains, which domain is used is based on performance so can also serve as a poor mans version of serving the same files from the nearest region
+* 1.0.0-rc.7 - increase default root margin to 256px from 48px
+* 1.0.0-rc.7 - adding mutation observer for attribute changes and dom node removal
+* 1.0.0-rc.7 - hide instead of completely remove elements from DOM so other scripts can find them if needed
 * 1.0.0-rc.6 - remove all for..of loops because they dont work in ie / edge and no polyfill is available so this was an easier solution
 * 1.0.0-rc.5 - bugfixes
 * 1.0.0-rc.5 - added options for previewLoading / previewFailure 

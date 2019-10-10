@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.6
+/** @preserve DemandJS - v.1.0.0-rc.7
  *
  * https://github.com/hannasm/demandjs
  *
@@ -15,45 +15,155 @@
           if (!added.parentNode) { continue; }
           this.checkAdditionRecursive(added);
         }
+        for (var j = 0; j < mutation.removedNodes.length; j++) {
+          var removed = mutation.removedNodes[j];
+          this.checkRemovalsRecursive(removed);
+        }
+      }
+    }
+    checkRemovalsRecursive(removed) {
+      var remaining = [removed];
+      while (remaining.length > 0) {
+        removed = remaining.shift();
+        if (this.hasRegistration(removed)) {
+          var {target, registration} = this.resolveTarget(removed);
+
+          if (!registration.loaded) { continue; }
+
+          if (registration.expectRemove) {
+            registration.expectRemove = false;
+            continue;
+          }
+          if (target.node === target.target) {
+            this.cleanupRegistrationTarget(registration);
+            continue;
+          } else {
+            this.cleanupPlaceholder(registration);
+            continue;
+          }
+        }
+
+        if (removed.children) {
+          for (var i = 0; i < removed.children.length; i++) {
+            remaining.push(removed.children[i]);
+          }
+        }
       }
     }
     checkAdditionRecursive(added) {
-      if (this.observed.has(added)) { return; }
-      this.observed.set(added, true);
+      var remaining = [added];
+      while (remaining.length > 0) {
+        added = remaining.shift();
+        if (this.observed.has(added)) { continue; }
+        this.observed.set(added, true);
+        
+        var res = this.isTargetMatch(added);
+        if (!res.loaded) {
+          if (res.isScript && res.injecting) {
+            this.injectedScript(added, res.injecting);
+            continue;
+          } else if (res.isMatch) {
+            this.observeTarget(added);
+            continue;
+          }
+        } 
 
-      var res = this.isTargetMatch(added);
-      if (!res.loaded) {
-        if (res.isScript && res.injecting) {
-          this.injectedScript(added, res.injecting);
-          return;
-        } else if (res.isMatch) {
-          this.observeTarget(added);
-          return;
+        if(added.children) {
+          for (var i = 0; i < added.children.length; i++) {
+            var child = added.children[i];
+            remaining.push(child);
+          }
         }
-      } 
+      }
+    }
+    observeAttributeMutation(mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var mutation = mutations[i];
+        if (mutation.type !== 'attributes') { continue; }
+        var node = mutation.target;
+        var aname = mutation.attributeName;
+        var {target, registration} = this.resolveTarget(node);
+        if (!registration.loaded) { 
+          if (!target.hasAttribute(aname)) { continue; }
+          if (val == registration.extraData[aname]) { continue; }
+          if (val === '') { continue; }
 
-      if(added.children) {
-        // modifying collectino while enumerating it leads to bad things so we need to make a copy 
-        // before we do anything else with the children here
-        let children = Array.prototype.slice.call(added.children);
-        for (var i = 0; i < children.length; i++) {
-          var child = children[i];
-          this.checkAdditionRecursive(child);
+          let reg = registration;
+          let val = target.getAttribute(aname);
+          switch (aname) {
+            case "src":
+              reg.extraData.src = val;
+              reg.extraData.hasSrc = true;
+              if (!registration.loading) { target.removeAttribute('src'); }
+              break;
+            case 'href':
+              reg.extraData.href = val;
+              reg.extraData.hasHref = true;
+              break;
+            case 'srcset':
+              reg.extraData.srcset = val;
+              reg.extraData.hasSrcset = true;
+              if (!registration.loading) { target.removeAttribute('srcset'); }
+              break;
+            case 'sizes':
+              reg.extraData.sizes = val;
+              reg.extraData.hasSizes = true;
+              if (!registration.loading) { target.removeAttribute('sizes'); }
+              break;
+            case 'type':
+              reg.extraData.type = val;
+              reg.extraData.hasType = true;
+              break;
+          }
+          continue; 
+        }
+
+        this.cleanupRegistrationTarget(target);
+
+        var mc = this.isTargetMatch(target);
+        if (mc.isMatch) {
+          this.observeTarget(target);
+          return;
         }
       }
     }
     observeIntersection(intersections) {
       for (var i = 0; i < intersections.length; i++) {
         var intersect = intersections[i];
-        if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) { continue; }
-        let reg = this.phRegistry.get(intersect.target);
-        if (reg === undefined || reg.loading) { continue; }
-        reg.loading = true;
-        this.beginLoad(reg);   
+        if (intersect.isIntersecting && intersect.intersectionRatio > 0) { 
+          let reg = this.phRegistry.get(intersect.target);
+          if (reg === undefined || reg.loading) { continue; }
+          reg = this.phRegistry.get(reg.target);
+          if (reg === undefined || reg.loading) { continue; }
+          this.beginLoad(reg);   
+        }
+      }
+    }
+    observeOutersection(intersections) {
+      for (var i = 0; i < intersections.length; i++) {
+        var intersect = intersections[i];
+        if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) { 
+          let reg = this.phRegistry.get(intersect.target);
+          if (reg === undefined) { continue; }
+          reg = this.phRegistry.get(reg.target);
+          if (reg === undefined) { continue; }
+          if (!reg.loaded) { continue; }
+          var target = reg.target;
+          var dims = target.getBoundingClientRect();
+          target.setAttribute('data-demandjs-width', dims.width);
+          target.setAttribute('data-demandjs-height', dims.height);
+          this.cleanupRegistrationTarget(target);
+
+          var mc = this.isTargetMatch(target);
+          if (mc.isMatch) {
+            this.observeTarget(target, reg);
+          }
+        }
       }
     }
     beginLoad(target) {
       var {target, registration} = this.resolveTarget(target);
+      registration.loading = true;
       if (registration.extraData.shouldInjectLink) {
         let url = registration.extraData.href;
 
@@ -63,6 +173,9 @@
             this.options.defaultDemandClass,
             this.onLoadBegin);
         onLoadBegin.call(this, target);
+
+        url = this.predictUrl(target, url);
+        registration.extraData.startTime = performance.now();
 
         fetch(url).then(function (response) {
           if (!response.ok) {
@@ -84,7 +197,7 @@
       }
     }
     isResourceLoaded(target) {
-      return target.complete || false;
+      return target.loaded || false;
     }
     injectLink(target, txt) {
       var {target, registration} = this.resolveTarget(target);
@@ -148,6 +261,8 @@
       document.write = oldDw;
     }
     injectHtml(target, txt) {
+      var {target, registration} = this.resolveTarget(target);
+
       var root = document.createElement('html');
       root.innerHTML = txt;
       var bodies = root.getElementsByTagName('body');
@@ -163,7 +278,10 @@
             id: injectionId 
           });
           injectionId += 1;
+          this.scrollSave();
           target.parentNode.insertBefore(bc, target);
+          this.scrollRestore();
+          registration.elements.push(bc);
         }
       }
     }
@@ -190,22 +308,33 @@
       }
 
       // iframe load event being triggered twice
-      if (!registration) { return; }
+      if (!registration || registration.loaded) { return; }
 
       if (registration.extraData.insertToLoad) {
-        target.style.display = registration.extraData.display;
+          var ph = registration.placeholders[0];
+          var cap = registration.extraData;
+          registration.target.style.display = cap.display;
+          registration.expectRemove = true;
+          this.scrollSave();
+          ph.parentNode.insertBefore(registration.target, ph);
+          this.scrollRestore();
+      } else if (this.options.shouldInsertOnLoad(registration.target)) {
+          var ph = registration.placeholders[0];
+          var cap = registration.extraData;
+          registration.target.style.display = cap.display;
       }
 
-      let first = this.options.shouldInsertOnLoad(registration.target);
-      for (var i = 0; i < registration.placeholders.length; i++) {
-        var placeholder = registration.placeholders[i];
-        if (first) {
-          first = false;
-          placeholder.parentNode.insertBefore(registration.target, placeholder);
-        }
-        this.cleanupPlaceholder(placeholder);
+      // remove all placeholders
+      this.cleanupPlaceholders(registration);
+
+      registration.loaded = true;
+      registration.extraData.endTime = performance.now();
+      this.recordPerformance(target, false);
+
+      if (this.options.enabledOffloading) {
+        this.outersection.observe(target);
       }
-      this.cleanupRegistrationTarget(registration);
+
 
       let onLoadSuccess = this.selectByDemandClass(
           target, this.options.onLoadSuccess,
@@ -220,16 +349,69 @@
           this.onLoadComplete);
       onLoadComplete.call(this, target);
     }
-    cleanupPlaceholder(placeholder) {
-        this.intersection.unobserve(placeholder);
-        placeholder.parentNode.removeChild(placeholder);
-        this.phRegistry.delete(placeholder);
+    cleanupPlaceholders(registration) {
+      var {target, registration} = this.resolveTarget(registration);
+      for (var i = 0; i < registration.placeholders.length; i++) {
+        this.cleanupPlaceholder(registration.placeholders[i], false);
+      }
+      registration.placeholders = [];
+    }
+    scrollSave() {
+      this.scrollSaveData = {
+        x: window.pageXOffset,
+        y: window.pageYOffset
+      };
+    }
+    scrollRestore() {
+      window.scrollTo(this.scrollSaveData.x, this.scrollSaveData.y);
+    }
+
+    cleanupPlaceholder(placeholder, removeFromTarget) {
+      if (typeof removeFromTarget === 'undefined') {
+        removeFromTarget = true;
+      }
+
+      this.intersection.unobserve(placeholder);
+
+      this.scrollSave();
+      placeholder.remove();
+      this.scrollRestore();
+
+      this.phRegistry.delete(placeholder);
+      this.observed.delete(placeholder);
+      this.injecting.delete(placeholder);
+
+      if (removeFromTarget) {
+        var phres = this.resolveTarget(placeholder);
+        var { target, registration } = this.resolveTarget(phres.registration.target);
+        registration.placeholders= registration.placeholders.filter(ph=>ph != placeholder);
+      }
     }
     cleanupRegistrationTarget(registration) {
-      this.intersection.unobserve(registration.target); // this only necesarry when we didnt remove the item
-      this.phRegistry.delete(registration.target);
-      this.loaded.set(registration.target, true);
+      var {target, registration} = this.resolveTarget(registration);
+
+      this.cleanupPlaceholders(registration);
+
+      this.observed.delete(target);
+      this.injecting.delete(target);
+      this.intersection.unobserve(target); // this only necesarry when we didnt remove the item
+      if (this.options.enableOffloading) {
+        this.outersection.unobserve(target);
+      }
+      this.phRegistry.delete(target);
+      registration.extraData.listeners.forEach(l=>target.removeEventListener(l.type, l.listener));
+      for (var i = 0; i < registration.extraData.children.length; i++) {
+        var child = registration.extraData.children[i];
+        this.releaseTarget(child, targetRoot);
+      }
+      var self = this;
+      registration.elements.forEach(e=>{
+        self.scrollSave();
+        e.remove();
+        self.scrollRestore();
+      });
     }
+
     handleError(target, ex) {
       var {target, registration} = this.resolveTarget(target);
 
@@ -250,34 +432,49 @@
           this.onLoadFailure);
 
       if (registration.extraData.insertToLoad) {
-        target.style.display = registration.extraData.display;
+        this.scrollSave();
+        target.remove();
+        this.scrollRestore();
+        target.style.display = 'none';
       }
 
-      let first = true;
-      for (var i = 0; i < registration.placeholders.length; i++) {
-        var placeholder = registration.placeholders[i];
-        if (first) {
-          first = false;
-          
-          if (!target.parentNode || registration.extraData.insertToLoad) {
-            placeholder.parentNode.insertBefore(target, placeholder);
-          }
+      onLoadFailure.call(this, target, ex);
 
-          onLoadFailure.call(this, target, ex);
-        }
-        this.cleanupPlaceholder(placeholder);
-      }
-      if (first) {
-        onLoadFailure.call(this, target, ex);
-      }
+      // remove placeholders
+      this.cleanupPlaceholders(registration);
 
-      this.cleanupRegistrationTarget(registration);
-      let onLoadComplete = this.selectByDemandClass(
-          target, this.options.onLoadComplete,
+      registration.loaded = true;
+      registration.extraData.endTime = performance.now();
+      this.recordPerformance(target, true);
+
+      let retryOnError = this.selectByDemandClass(
+          target, this.options.retryOnError,
           this.options.demandClassAttribute,
           this.options.defaultDemandClass,
-          this.onLoadComplete);
-      onLoadComplete.call(this, target);
+          false);
+      let maxRetries = this.selectByDemandClass(
+          target, this.options.maxRetries,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          2);
+      if (retryOnError && registration.retryCount < maxRetries) {
+        registration.loading = false;
+        registration.loaded = false;
+        registration.retryCount+=1;
+        registration.retryDelay = 500 * Math.pow(2, registration.retryCount);
+        this.clearAttributes(target, registration.extraData);
+        var self = this;
+        setTimeout(function () {
+          self.beginLoad(target);
+        }, registration.retryDelay);
+      } else {
+        let onLoadComplete = this.selectByDemandClass(
+            target, this.options.onLoadComplete,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.onLoadComplete);
+        onLoadComplete.call(this, target);
+      }
     }
     onLoadBegin(t) {
       //  nothing to do here
@@ -289,6 +486,8 @@
       //  nothing to do here
     }
     onLoadFailure(target, ex) {
+        var {target, registration} = this.resolveTarget(target);
+
         var createFailureNode = this.selectByDemandClass(
             target, this.options.createFailureNode,
             this.options.demandClassAttribute,
@@ -296,15 +495,28 @@
             this.createFailureNode);
         var errorUI = createFailureNode.call(this, target, ex);
         errorUI = Array.prototype.slice.call(errorUI);
+
+        var placeholders = registration.placeholders = registration.placeholders.concat(errorUI);
+
         for (var i = 0; i < errorUI.length; i++) {
           var eui = errorUI[i];
+          var errReg = this.registerPlaceholder(eui, target, placeholders, registration.extraData);
           // register placeholders so if they contain media we dont try to demand load them...
-          this.loaded.set(eui, true); 
+          errReg.loaded = true;
 
+          this.scrollSave();
           target.parentNode.insertBefore(eui, target);
+          this.scrollRestore();
         }
         if (this.options.shouldRemove(target)) {
-          target.parentNode.removeChild(target);
+          if (registration.extraData.insertToLoad) {
+            registration.expectRemove = true;
+            this.scrollSave();
+            target.remove();
+            this.scrollRestore();
+          } else {
+            target.style.display = 'none';
+          }
         }
     }
     selectByDemandClass(t, data, attr, defaultKey, defaultData) {
@@ -357,10 +569,22 @@
         node: node,
         placeholders: placeholders,
         extraData: extraData,
-        loading: false
+        loading: false,
+        elements: [],
+        loaded: false,
+        expectRemove: false,
+        retryCount: 0
       };
       this.phRegistry.set(node, result);
       return result;
+    }
+    hasRegistration(target) {
+      // if we are passed a registration get the contained target
+      if (('isRegistration' in target) && target.isRegistration) {
+        target = target.node;
+      }
+
+      return this.phRegistry.has(target);
     }
     resolveTarget(target) {
       var registration = target;
@@ -377,7 +601,6 @@
     restoreTarget(target) {
       var {target, registration} = this.resolveTarget(target);
       var extraData = registration.extraData;
-      registration.loading = true;
 
       let onLoadBegin = this.selectByDemandClass(
           target, this.options.onLoadBegin,
@@ -400,7 +623,7 @@
         target.setAttribute('sizes', extraData.sizes);
       }
       if (extraData.hasSrc) {
-        target.setAttribute('src', extraData.src);
+        target.setAttribute('src', this.predictUrl(target, extraData.src));
       }
       if (extraData.children.length > 0) {
         for (var i = 0; i < extraData.children.length; i++) {
@@ -411,8 +634,22 @@
 
       if (extraData.insertToLoad) {
         target.style.display = 'none';
-        this.loaded.set(target);
+        this.scrollSave();
         document.body.appendChild(target);
+        this.scrollRestore();
+      }
+
+      extraData.startTime = performance.now();
+    }
+    clearAttributes(target, store) {
+      if (store.hasSrc) {
+        target.removeAttribute('src');
+      }
+      if (store.hasSrcset) {
+        target.removeAttribute('srcset');
+      }
+      if (store.hasSizes) {
+        target.removeAttribute('sizes');
       }
     }
     captureTarget(target, targetRoot) {
@@ -430,22 +667,20 @@
         'href': target.getAttribute('href'),
         'hasType': target.hasAttribute('type'),
         'type': target.getAttribute('type'),
+        'hasDemandWidth': target.hasAttribute('data-demandjs-width'),
+        'demandWidth': target.getAttribute('data-demandjs-width'),
+        'hasDemandHeight': target.hasAttribute('data-demandjs-height'),
+        'demandHeight': target.getAttribute('data-demandjs-height'),
         'hasDisplay': target.style && target.style.display,
         'display': target.style.display || '',
         'children': [],
         'shouldRestore': false,
         'canLoad': false,
-        'shouldInjectLink': false
+        'shouldInjectLink': false,
+        'listeners': [],
+        'performancePrediction': {}
       };
-      if (store.hasSrc) {
-        target.removeAttribute('src');
-      }
-      if (store.hasSrcset) {
-        target.removeAttribute('srcset');
-      }
-      if (store.hasSizes) {
-        target.removeAttribute('sizes');
-      }
+      this.clearAttributes(target, store);
 
       if (store.isLink && store.hasHref) {
         store.shouldInjectLink = true;
@@ -459,31 +694,56 @@
       if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
         store.shouldRestore = true;
         store.canLoad = true;
-        
-       if(  ('tagName' in target) && target.tagName.match(/video|audio/i)) {
-        target.addEventListener('loadedmetadata', evt=>this.processSuccess(targetRoot));
-        target.addEventListener('loadeddata', evt=>this.processSuccess(targetRoot));
-       } else {
-        target.addEventListener('load', evt=>this.processSuccess(targetRoot));
-       }
+     
+        let listeners = [];
+        if(  ('tagName' in target) && target.tagName.match(/video|audio/i)) {
+           listeners.push({
+             type:'loadedmetadata', 
+             listener:evt=>this.processSuccess(targetRoot)
+           });
+           listeners.push({
+             type:'loadeddata', 
+             listener:evt=>this.processSuccess(targetRoot)
+           });
+         } else {
+           listeners.push({
+             type:'load', 
+             listener:evt=>this.processSuccess(targetRoot)
+           });
+         }
 
         if (store.hasSrcset && store.hasSrc) {
-          target.addEventListener('error', evt=>{
-            this.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'))
+          listeners.push({
+            type:'error', 
+            listener:evt=>{
+              this.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'));
+            }
           });
         } else if (store.hasSrcset) {
-          target.addEventListener('error', evt=>{
-            this.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'))
+          listeners.push({
+            type:'error', 
+            listener:evt=>{
+              this.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'))
+            }
           });
         } else if (store.hasSrc) {
-          target.addEventListener('error', evt=>{
-            this.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'))
+          listeners.push({
+            type:'error', 
+            listener:evt=>{
+              this.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'))
+            }
           });
         } else {
-          target.addEventListener('error', evt=>{
-            this.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'))
+          listeners.push({
+            type:'error', 
+            listener:evt=>{
+              this.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'))
+            }
           });
         }
+
+        listeners.forEach(l=>target.addEventListener(l.type, l.listener));
+        store.listeners = listeners;
       }
 
       if ('tagName' in target && target.tagName.match(/picture|video|audio/i)) {
@@ -492,13 +752,141 @@
         }
         for (var i = 0; i < target.children.length; i++) {
           var child = target.children[i];
-          var desc = this.captureTarget(child);
+          var desc = this.captureTarget(child, targetRoot);
           desc.index = i;
           store.children.push(desc);
         }
       }
 
       return store;
+    }
+    getPerformanceRecord(url) {
+      if (!(url in this.options.urlPerformance)) {
+        this.options.urlPerformance[url] = {
+          predictedSpeed: 0,
+          bitsPerMillisecond: [],
+          currentUsage: 0
+        };
+      }
+      return this.options.urlPerformance[url];
+    }
+    getPerformanceSize(url, target) {
+      var entries = performance.getEntriesByName(url);
+      for (var i = 0 ; i < entries.length; i++) {
+        var entry = entries[i];
+        if (entry.transferSize) { return entry.transferSize; }
+      }
+
+      return this._defaultFileSize(target);
+    }
+    _defaultFileSize(target) {
+      return this.selectByDemandClass(
+          target, this.options.defaultFileSize,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          512 * 1024);
+    }
+    _defaultPerfSpeed(target) {
+      return this._defaultFileSize(target) / 1000;
+    }
+    _getFailureMultiplier() {
+      return 100000;
+    }
+    _recordPerformance(target, url, bitsPerMillisecond, prediction) {
+      var arr = this.getPerformanceRecord(url);
+
+      arr.bitsPerMillisecond.push(bitsPerMillisecond);
+
+      var avg = 0;       
+      for (var i = 0; i < arr.bitsPerMillisecond.length; i++) {
+        avg += arr.bitsPerMillisecond[i];
+      }
+      avg /= arr.bitsPerMillisecond.length;
+      while (arr.bitsPerMillisecond.length > this.options.maxPerformanceRecords) {
+        arr.bitsPerMillisecond.shift();
+      }
+      arr.predictedSpeed = avg;
+      arr.currentUsage -= prediction;
+    }
+    recordPerformance(target, failure) {
+      var {registration, target} = this.resolveTarget(target);
+      var ed = registration.extraData;
+
+      var duration = ed.endTime - ed.startTime;
+      if (failure) {
+        duration *= this._getFailureMultiplier();
+      }
+      if (ed.hasSrc) {
+        var url = ed.src;
+        var perf = duration / this.getPerformanceSize(url);
+        var prediction = registration.extraData.performancePrediction;
+        this._recordPerformance(target, prediction.prefix, perf, prediction.speed);
+      }
+      if (ed.hasHref) {
+        var url = ed.href;
+        var perf = duration / this.getPerformanceSize(url);
+        var prediction = registration.extraData.performancePrediction;
+        this._recordPerformance(target, prediction.prefix, perf, prediction.speed);
+      }
+    }
+    predictUrl(target, url) {
+      var {registration, target} = this.resolveTarget(target);
+
+      var { suffix, alternatives } = this.getAlternatives(url);
+      var bestSpeed = this._defaultPerfSpeed(target), bestUsage = null, bestUrl = url;
+      for (var i = 0; i < alternatives.length; i++) {
+        var altUrl = alternatives[i];
+        var perf = this.getPerformanceRecord(altUrl);
+        var prediction = perf.currentUsage + perf.predictedSpeed;
+        if (bestUsage === null || prediction < bestUsage) {
+          bestUsage = prediction;
+          bestSpeed = perf.predictedSpeed;
+          bestUrl = altUrl;
+        }
+      }
+      
+      this.getPerformanceRecord(bestUrl).currentUsage += bestSpeed;
+      registration.extraData.performancePrediction = {
+        prefix: bestUrl,
+        speed: bestSpeed
+      };
+
+
+      return bestUrl + suffix;
+    }
+    getAlternatives(url) {
+      if (!(typeof url === 'string')) { throw 'Expected url but got ' + (typeof url); }
+
+      for (var i = 0; i < this.options.alternatives.length; i++) {
+        var altSet = this.options.alternatives[i];
+        if (Array.isArray(altSet)) {
+          for (var j = 0; j < altSet.length; j++) {
+            var item = altSet[j];
+            if (typeof item === 'string') { 
+              if (url.startsWith(item)) {
+                return { 
+                  suffix: url.substring(item.length),
+                  alternatives: altSet
+                }
+              }
+            }
+          }
+        }
+      }
+
+      var idx = 0, cnt = 0, bestUrl = url, suffix='';
+      while (idx >= 0 && cnt < 3) {
+        cnt++;
+        idx = url.indexOf('/', idx+1);
+      }
+      if (idx >= 0) {
+        bestUrl = url.substring(0, idx);
+        suffix = url.substring(idx);
+      }
+      return {
+        suffix: suffix,
+        alternatives: [bestUrl]
+      };
     }
     isContextExcluded(target) {
       if (!target) { return false; }
@@ -511,7 +899,7 @@
       // need to recurse up for cases like video with embedded html as a fallback
       return this.isContextExcluded(parent);
     }
-    observeTarget(target) {
+    observeTarget(target, oldRegistration) {
       if (this.isResourceLoaded(target)) {
         // do nothing, its already fully loaded
       } else if (this.isContextExcluded(target)) { 
@@ -529,15 +917,35 @@
 
         for (var i = 0; i < placeholders.length; i++) {
           var placeholder = placeholders[i];
-          this.registerPlaceholder(placeholder, target, placeholders, store);
+
+          if (store.hasDemandWidth) {
+            placeholder.style.width = store.demandWidth;
+          }
+          if (store.hasDemandHeight) {
+            placeholder.style.height = store.demandHeight;
+          }
+
+          var placeReg = this.registerPlaceholder(placeholder, target, placeholders, store);
           // register placeholders so if they contain media we dont try to demand load them...
-          this.loaded.set(placeholder, true); 
-          target.parentNode.insertBefore(placeholder, target);
+          placeReg.loaded = true;
+
+          this.scrollSave();
+          target.insertAdjacentElement('beforeBegin', placeholder);
+          this.scrollRestore();
+
           this.intersection.observe(placeholder);
         }
-        this.registerPlaceholder(target, target, placeholders, store);
+        var registration = this.registerPlaceholder(target, target, placeholders, store);
+        this.attributeMutations.observe(target, this.attributeMutationOptions);
         if (this.options.shouldRemove(target)) {
-          target.parentNode.removeChild(target);
+          if (store.insertToLoad) {
+            registration.expectRemove = true;
+            this.scrollSave();
+            target.remove();
+            this.scrollRestore();
+          } else {
+            target.style.display = 'none';
+          }
         } else {
           this.intersection.observe(target);
         }
@@ -550,7 +958,8 @@
       }
     }
     isLoadedRecursive(target, injecting) {
-      if (this.loaded.has(target)) { return { loaded: true, injecting: injecting || this.injecting.get(target) }; }
+      var { target, registration } = this.resolveTarget(target);
+      if (typeof registration !== 'undefined' && registration && registration.loaded) { return { loaded: true, injecting: injecting || this.injecting.get(target) }; }
       // we cant be injecting an element and loading it simultaneously
       if (!injecting && target.parentNode) {
        return this.isLoadedRecursive(target.parentNode, injecting || this.injecting.get(target));
@@ -590,7 +999,6 @@
     }
     constructor(options) {
       this.phRegistry = new WeakMap();
-      this.loaded = new WeakMap();
       this.injecting = new WeakMap();
       this.observed = new WeakMap();
 
@@ -616,12 +1024,23 @@
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',
-        rootMargin: '48px',
+        rootMargin: '256px',
         threshold: 0.001,
+        rootMarginOuter: '2048px',
+        thresholdOuter: 0.001,
+        enableOffloading: false,
         onLoadBegin: t=>this.onLoadBegin(t),
         onLoadSuccess: t=>this.onLoadSuccess(t),
         onLoadFailure: (t,e)=>this.onLoadFailure(t,e),
         onLoadComplete: t=>this.onLoadComplete(t),
+        alternatives: [],
+        urlPerformance: {},
+        defaultFileSize: 1024 * 512, // 512KB
+        maxPerformanceRecords: 7,
+        retryOnError: true,
+        maxRetries: 2,
+        emptyImageUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+
         linkHandler: {
           'text/html': (t,c)=>this.injectHtml(t,c),
           'application/xhtml+xml': (t,c)=>this.injectHtml(t,c)
@@ -641,6 +1060,23 @@
         threshold:this.options.threshold 
       };
       this.intersection = new IntersectionObserver( (a,b)=>this.observeIntersection(a,b), this.intersectionOptions);
+
+      if (this.options.enableOffloading) {
+        this.outersectionOptions = {
+          root: null,
+          rootMargin:this.options.rootMarginOuter,
+          threshold:this.options.thresholdOuter 
+        };
+        this.outersection = new IntersectionObserver( (a,b)=>this.observeOutersection(a,b), this.outersectionOptions);
+      }
+
+      this.attributeMutations = new MutationObserver((a,b)=>this.observeAttributeMutation(a,b));
+      this.attributeMutationOptions = { 
+        attributes: true, 
+        attributeFilter: ['src', 'href', 'srcset', 'sizes', 'type'],
+        attributeOldValue: false
+      };
+
   
       var targets = this.queryTargets();
       this.observeTargets(targets);
