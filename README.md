@@ -448,6 +448,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.8 - flushing out resource offloading functionality to some more practical use cases identified through experience
 * 1.0.0-rc.7 - retry on failed requests, potentially using load balacning to attepmt alternative urls, with exponential backoff delays
 * 1.0.0-rc.7 - add ability to setup load balancing of requests across multiple domains, which domain is used is based on performance so can also serve as a poor mans version of serving the same files from the nearest region
 * 1.0.0-rc.7 - increase default root margin to 256px from 48px
