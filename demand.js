@@ -287,7 +287,8 @@
     }
     shouldTrackOffloading(target) {
       if (target.nodeName !== 'IMG' &&
-        target.nodeName !== 'VIDEO') {
+        target.nodeName !== 'VIDEO' &&
+        target.nodeName !== 'PICTURE') {
         return false;
       }
       return this.options.enableOffloading;

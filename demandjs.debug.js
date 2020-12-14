@@ -363,7 +363,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'shouldTrackOffloading',
       value: function shouldTrackOffloading(target) {
-        if (target.nodeName !== 'IMG' && target.nodeName !== 'VIDEO') {
+        if (target.nodeName !== 'IMG' && target.nodeName !== 'VIDEO' && target.nodeName !== 'PICTURE') {
           return false;
         }
         return this.options.enableOffloading;
