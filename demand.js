@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.7
+/** @preserve DemandJS - v.1.0.0-rc.8
  *
  * https://github.com/hannasm/demandjs
  *
@@ -285,6 +285,13 @@
         }
       }
     }
+    shouldTrackOffloading(target) {
+      if (target.nodeName !== 'IMG' &&
+        target.nodeName !== 'VIDEO') {
+        return false;
+      }
+      return this.options.enableOffloading;
+    }
     processSuccess(target) {
       var {target, registration} = this.resolveTarget(target);
 
@@ -331,10 +338,9 @@
       registration.extraData.endTime = performance.now();
       this.recordPerformance(target, false);
 
-      if (this.options.enabledOffloading) {
+      if (this.shouldTrackOffloading(target)) {
         this.outersection.observe(target);
       }
-
 
       let onLoadSuccess = this.selectByDemandClass(
           target, this.options.onLoadSuccess,
@@ -363,6 +369,7 @@
       };
     }
     scrollRestore() {
+      return;
       window.scrollTo(this.scrollSaveData.x, this.scrollSaveData.y);
     }
 
@@ -680,6 +687,8 @@
         'listeners': [],
         'performancePrediction': {}
       };
+      // The assumption is that this is the only way these attribute can be defined, somebody could potentially set these attributes manually and this would violate that assumption
+      store.isOffloading = store.hasDemandWidth || store.hasDemandHeight;
       this.clearAttributes(target, store);
 
       if (store.isLink && store.hasHref) {
@@ -912,18 +921,11 @@
             this.options.demandClassAttribute,
             this.options.defaultDemandClass,
             this.createLoadingNode);
-        var placeholders = createLoadingNode.call(this, target);
+        var placeholders = createLoadingNode.call(this, target, store);
         placeholders = Array.prototype.slice.call(placeholders);
 
         for (var i = 0; i < placeholders.length; i++) {
           var placeholder = placeholders[i];
-
-          if (store.hasDemandWidth) {
-            placeholder.style.width = store.demandWidth;
-          }
-          if (store.hasDemandHeight) {
-            placeholder.style.height = store.demandHeight;
-          }
 
           var placeReg = this.registerPlaceholder(placeholder, target, placeholders, store);
           // register placeholders so if they contain media we dont try to demand load them...

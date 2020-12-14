@@ -3,7 +3,13 @@
 
 ## Version
 
-1.0.0-rc.7 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.8 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+
+## Acknowledgement
+
+If you find this project useful and would like to make a contribution you may do so here.
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=hannasm%40gmail.com&item_name=demandjs&currency_code=USD)
 
 ## Overview
 
@@ -283,21 +289,64 @@ var options = {
 
 ## *Experimental* Resource Offloading
 
-Resource offloading is a matter of removing images / other demand loaded elements from the page when they are no longer within view and are unneeded. This can help low resource mobile devices and tablets view pages with lots of content.
+Resource offloading is the process of removing images / other demand loaded elements from the page when they are no longer within view and are unneeded. This can help improve performance on pages with large amounts of content, and especially on resource constrained devices.
 
-While implementing this feature there seemed to be a lot of issues with browser scrolling in chrome. Inserting / removing elements caused the scrollbar to jump around haphazardly. A workaround was to save the scroll position / remove the element / reinstate the scroll position, but this still results in some uncomfortable jitter in the page.
+Resource offloading is also difficult because it can cause layout changes that will create jarring disruptions to the viewport and scroll position. The css of the page and the placeholder content used during off-loading must be designed in such a way that when off-loading, the page layout remains exactly the same after offloading as prior to offloading. The css and placeholder are both user-configurable and so it's not something demandjs can do without some help from the user.
 
-This hasn't been tested in other browsers yet and is disabled by default, but available in it's current form for further experimentation to take place and other browser issues to be identified and investigated.
+If you would like to use offloading you must take some steps to make that offloading work properly. First and foremost you must enable this feature since it is disabled by default. Configuring margin and thresholds for the offloading operation might be appropriate but the defaults may be sufficient. Finally you must implement placeholders that accomodate the page layout when resources are offloaded. A couple of details are calculated for you during the offloading to make this process easier, but ultimately you must ensure that the placeholder fits in the space it is intended, and consumes the same amount off size as the original image did previously.
 
 ```javascript
 var options = {
   enableOffloading: true,
   rootMarginOuter: '2048px',
-  thresholdOuter: 0.001
+  thresholdOuter: 0.001,
+  createLoadingNode: function (tgt, info) {
+		var ele = document.createElement('div');
+		ele.style.position = 'relative';
+		ele.style.top = '50%';
+    ele.style.bottom = '50%';
+		ele.style.zIndex = 100;
+		ele.style.color = '#FFF';
+
+		var mainEle = document.createElement('div');
+		mainEle.innerText = 'Loading in progress';
+
+		if (info.isOffloading) {
+			var inner = mainEle;
+			var cvsSize = document.createElement('canvas');
+			cvsSize.width = info.demandWidth;
+			cvsSize.height = info.demandHeight;
+			cvsSize.style.backgroundColor = '#F00';
+
+			mainEle = document.createElement('img');
+			mainEle.src = cvsSize.toDataURL('image/jpeg');
+			mainEle.className = 'nodemand';
+
+			inner.style.position = 'absolute';
+			inner.style.top = '50%';
+			inner.style.bottom = '50%';
+			inner.style.left = '50%';
+			inner.style.right = '50%';
+			inner.style.zIndex = 100;
+			inner.style.color = '#FFF';
+			ele.appendChild(inner);
+		}
+
+		ele.appendChild(mainEle);
+		return [ele];
+  }
 };
 ```
 
-See the configuration section below for further details.
+In the code snippet above, the property `info.isOffloading` is used to determine whether the placeholder is being created for an offloading operation instead of a normal placeholder. `info.demandWidth` and `info.demandHeight` represent the exact layout height and width of the elements being offloaded. 
+
+The placeholder is a div with the text 'Loading In Progress'. However when offloading, we take extra steps to generate a placeholder that will layout with the same dimensions as the offloaded image by rendering a canvas of the appropriate size. 
+
+There are likely other solutions to proper offloading placeholders, based on your page design, but this example should be useful as a starting point.
+
+Debugging offloaded layout issues is frustrating and tricky because you are trying to address details and events that are ocurring off screen. At least in a chrome browser with developer console, it is possible to set a breakpoint during a particular offloading operation and then inspect the dom / observe the page layout with the javascript code paused. You will ultimately have to improvise your own approach to finding and fixing issues.
+
+See the configuration section below for some additional details about the configuration options available.
 
 ## Configuration
 
@@ -308,7 +357,7 @@ See the configuration section below for further details.
   | demandClassAttribute   | This option specifies the attribute used to lookup the demand class on each element | data-demand | no |
   | defaultDemandClass     | This option specifies the demand class that is used if no demand class is specified | default | no |
   | loadingHtml            | This option controls the Html injected into the page while elements are loading. This is the easiest way to configure the loading indicator UI | `<div style="width:100%;height:100%">Loading In Progress</div>` | yes |
-  | createLoadingNode      | ```function(target){}``` This is a function, invoked each time loading UI must be created. It is passed one argument, the html element that is being replaced. In case the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified | yes |
+  | createLoadingNode      | ```function(target,info){}``` This is a function, invoked each time loading UI must be created. It is passed two arguments, the html element that is being replaced and an info node containing internal details about the element the loading node is replacing. Some fields from the info object are documented in the documentation for offloading. In cases where the loadingHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that can be inserted into the DOM. | Defined as a functor to creating the `loadingHtml` specified | yes |
   | failureHtml             | This option controls the Html injected into the page when loading fails. This is the easy way to configure a special UI for error messages | `<div style="background-color:#F00;color:#FFF;font-size:20pt;">ERROR</div>` | yes |
   | createFailureNode     | ```function(target,error){}``` This is a function, invoked each time loading fails, and error  UI must be created. It is passed two arguments, the first is the html element that has failed. The second is a standard javascript 'Error'. In case the failureHtml option isn't robust enough, you can overlaod this function to have full control over the loading UI being injected into the page. This function should return a collection of htmlElement nodes that will be inserted into the DOM automatically. | Defines a functor to creating the `failureHtml` | yes |
   | selector             | This is a css selector, defining which elements should be matched and processed. You can change this to include additional elements, or limit the elements being procssed to a subset of the entire page. You may use the full selector syntax (see https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Selectors)  | `img,video,picture,iframe,link.demand` | no |
