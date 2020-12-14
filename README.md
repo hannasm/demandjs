@@ -293,6 +293,8 @@ Resource offloading is the process of removing images / other demand loaded elem
 
 Resource offloading is also difficult because it can cause layout changes that will create jarring disruptions to the viewport and scroll position. The css of the page and the placeholder content used during off-loading must be designed in such a way that when off-loading, the page layout remains exactly the same after offloading as prior to offloading. The css and placeholder are both user-configurable and so it's not something demandjs can do without some help from the user.
 
+Resource offloading is currently limited to img, picture, and video elements. Offloading large chunks of html, iframes, and other content will need to be adressed at a later time.
+
 If you would like to use offloading you must take some steps to make that offloading work properly. First and foremost you must enable this feature since it is disabled by default. Configuring margin and thresholds for the offloading operation might be appropriate but the defaults may be sufficient. Finally you must implement placeholders that accomodate the page layout when resources are offloaded. A couple of details are calculated for you during the offloading to make this process easier, but ultimately you must ensure that the placeholder fits in the space it is intended, and consumes the same amount off size as the original image did previously.
 
 ```javascript
