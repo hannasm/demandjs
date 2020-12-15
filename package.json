@@ -1,0 +1,25 @@
+{
+  "name": "demandjs",
+  "version": "1.0.0-rc.9",
+  "description": "lazy loading of html resources",
+  "main": "demandjs.min.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hannasm/demandjs.git"
+  },
+  "keywords": [
+    "lazy",
+    "load",
+    "infinite",
+    "scroll",
+    "demand"
+  ],
+  "author": "Sean Hanna",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hannasm/demandjs/issues"
+  },
+  "homepage": "https://github.com/hannasm/demandjs#readme"
+}
