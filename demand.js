@@ -1,9 +1,21 @@
 /** @preserve DemandJS - v.1.0.0-rc.8
  *
  * https://github.com/hannasm/demandjs
- *
  **/
-(function (ctx) {
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define([], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        // Node. Does not work with strict CommonJS, but
+        // only CommonJS-like environments that support module.exports,
+        // like Node.
+        module.exports = factory();
+    } else {
+        // Browser globals (root is window)
+        root.DemandJS = factory();
+  }
+}(typeof self !== 'undefined' ? self : this, function (ctx) {
   class DemandJS {
     observeMutation(mutations) {
       for (var i = 0; i < mutations.length; i++) {
@@ -1087,8 +1099,8 @@
     }
   }
 
-  ctx['DemandJS'] = DemandJS;
-})(window);
+  return DemandJS;
+}));
 /** @license MIT License
 
 Copyright (c) 2017 Sean Hanna
