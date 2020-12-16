@@ -6,7 +6,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.8
+/** @preserve DemandJS - v.1.0.0-rc.9
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -184,57 +184,116 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
+      key: 'cooperativeExecute',
+      value: function cooperativeExecute() {
+        var func = this.queuedFuncs.shift();
+        func();
+        if (this.queuedFuncs.length > 0) {
+          var self = this;
+          setTimeout(function () {
+            self.cooperativeExecute();
+          }, 0);
+        }
+      }
+    }, {
+      key: 'cooperativeQueue',
+      value: function cooperativeQueue(funcFactory) {
+        this.queuedFuncs.push(funcFactory());
+        if (this.queuedFuncs.length === 1) {
+          var self = this;
+          setTimeout(function () {
+            self.cooperativeExecute();
+          }, 0);
+        }
+      }
+    }, {
       key: 'observeIntersection',
       value: function observeIntersection(intersections) {
+        var _this = this;
+
         for (var i = 0; i < intersections.length; i++) {
           var intersect = intersections[i];
           if (intersect.isIntersecting && intersect.intersectionRatio > 0) {
-            var reg = this.phRegistry.get(intersect.target);
-            if (reg === undefined || reg.loading) {
-              continue;
-            }
-            reg = this.phRegistry.get(reg.target);
-            if (reg === undefined || reg.loading) {
-              continue;
-            }
-            this.beginLoad(reg);
+            var self;
+
+            var _ret = function () {
+              var reg = _this.phRegistry.get(intersect.target);
+              if (reg === undefined || reg.loading) {
+                return 'continue';
+              }
+              reg = _this.phRegistry.get(reg.target);
+              if (reg === undefined || reg.loading) {
+                return 'continue';
+              }
+
+              self = _this;
+
+              _this.cooperativeQueue(function () {
+                var reg2 = reg;
+                return function () {
+                  self.beginLoad(reg2);
+                };
+              });
+            }();
+
+            if (_ret === 'continue') continue;
           }
         }
       }
     }, {
       key: 'observeOutersection',
       value: function observeOutersection(intersections) {
+        var _this2 = this;
+
         for (var i = 0; i < intersections.length; i++) {
           var intersect = intersections[i];
           if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) {
-            var reg = this.phRegistry.get(intersect.target);
-            if (reg === undefined) {
-              continue;
-            }
-            reg = this.phRegistry.get(reg.target);
-            if (reg === undefined) {
-              continue;
-            }
-            if (!reg.loaded) {
-              continue;
-            }
-            var target = reg.target;
-            var dims = target.getBoundingClientRect();
-            target.setAttribute('data-demandjs-width', dims.width);
-            target.setAttribute('data-demandjs-height', dims.height);
-            this.cleanupRegistrationTarget(target);
+            var target;
+            var dims;
+            var self;
 
-            var mc = this.isTargetMatch(target);
-            if (mc.isMatch) {
-              this.observeTarget(target, reg);
-            }
+            var _ret2 = function () {
+              var reg = _this2.phRegistry.get(intersect.target);
+              if (reg === undefined) {
+                return 'continue';
+              }
+              reg = _this2.phRegistry.get(reg.target);
+              if (reg === undefined) {
+                return 'continue';
+              }
+              if (!reg.loaded) {
+                return 'continue';
+              }
+              target = reg.target;
+              dims = target.getBoundingClientRect();
+
+              target.setAttribute('data-demandjs-width', dims.width);
+              target.setAttribute('data-demandjs-height', dims.height);
+
+              self = _this2;
+
+              _this2.cooperativeQueue(function () {
+                var target2 = target;
+                var reg2 = reg;
+                return function () {
+                  self.cleanupRegistrationTarget(target2);
+
+                  var mc = self.isTargetMatch(target2);
+                  if (mc.isMatch) {
+                    self.observeTarget(target2, reg2);
+                  }
+                };
+              });
+            }();
+
+            if (_ret2 === 'continue') continue;
           }
         }
       }
     }, {
       key: 'beginLoad',
       value: function beginLoad(target) {
-        var _this = this;
+        var _this3 = this;
 
         var _resolveTarget3 = this.resolveTarget(target),
             target = _resolveTarget3.target,
@@ -258,14 +317,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             }
             return response.text();
           }).then(function (txt) {
-            _this.injectLink(registration, txt);
+            _this3.injectLink(registration, txt);
           }).catch(function (ex) {
-            _this.handleError(registration, ex);
+            _this3.handleError(registration, ex);
           });
         } else if (registration.extraData.shouldRestore) {
           // setTimeout helps keep loading animations smooth
           setTimeout(function () {
-            return _this.restoreTarget(registration);
+            return _this3.restoreTarget(registration);
           }, 0);
         } else {
           throw 'Unknown load operation';
@@ -308,7 +367,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectedScript',
       value: function injectedScript(bc, injecting) {
-        var _this2 = this;
+        var _this4 = this;
 
         var localScriptId = injecting.id;
         var codePromise = Promise.resolve(bc.innerHTML);
@@ -322,7 +381,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           localScriptId = bc.src + '#' + localScriptId;
         }
         codePromise.then(function (code) {
-          _this2.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
+          _this4.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
         });
       }
     }, {
@@ -373,12 +432,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
       }
     }, {
+      key: 'isOffloadingEnabled',
+      value: function isOffloadingEnabled(target) {
+        return this.selectByDemandClass(target, this.options.enableOffloading, this.options.demandClassAttribute, this.options.defaultDemandClass, false);
+      }
+    }, {
       key: 'shouldTrackOffloading',
       value: function shouldTrackOffloading(target) {
         if (target.nodeName !== 'IMG' && target.nodeName !== 'VIDEO' && target.nodeName !== 'PICTURE') {
           return false;
         }
-        return this.options.enableOffloading;
+        return this.isOffloadingEnabled(target);
       }
     }, {
       key: 'processSuccess',
@@ -450,16 +514,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scrollSave',
       value: function scrollSave() {
-        this.scrollSaveData = {
-          x: window.pageXOffset,
-          y: window.pageYOffset
-        };
+        return;
       }
     }, {
       key: 'scrollRestore',
       value: function scrollRestore() {
         return;
-        window.scrollTo(this.scrollSaveData.x, this.scrollSaveData.y);
       }
     }, {
       key: 'cleanupPlaceholder',
@@ -502,7 +562,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.observed.delete(target);
         this.injecting.delete(target);
         this.intersection.unobserve(target); // this only necesarry when we didnt remove the item
-        if (this.options.enableOffloading) {
+        if (this.isOffloadingEnabled(target)) {
           this.outersection.unobserve(target);
         }
         this.phRegistry.delete(target);
@@ -774,7 +834,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'captureTarget',
       value: function captureTarget(target, targetRoot) {
-        var _this3 = this;
+        var _this5 = this;
 
         var store = {
           'target': target,
@@ -824,20 +884,20 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             listeners.push({
               type: 'loadedmetadata',
               listener: function listener(evt) {
-                return _this3.processSuccess(targetRoot);
+                return _this5.processSuccess(targetRoot);
               }
             });
             listeners.push({
               type: 'loadeddata',
               listener: function listener(evt) {
-                return _this3.processSuccess(targetRoot);
+                return _this5.processSuccess(targetRoot);
               }
             });
           } else {
             listeners.push({
               type: 'load',
               listener: function listener(evt) {
-                return _this3.processSuccess(targetRoot);
+                return _this5.processSuccess(targetRoot);
               }
             });
           }
@@ -846,28 +906,28 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             listeners.push({
               type: 'error',
               listener: function listener(evt) {
-                _this3.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'));
+                _this5.handleError(targetRoot, new Error('Loading for srcset and src failed (' + store.srcset + ')(' + store.src + ')'));
               }
             });
           } else if (store.hasSrcset) {
             listeners.push({
               type: 'error',
               listener: function listener(evt) {
-                _this3.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'));
+                _this5.handleError(targetRoot, new Error('Loading for srcset failed (' + store.srcset + ')'));
               }
             });
           } else if (store.hasSrc) {
             listeners.push({
               type: 'error',
               listener: function listener(evt) {
-                _this3.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'));
+                _this5.handleError(targetRoot, new Error('Loading for src failed (' + store.src + ')'));
               }
             });
           } else {
             listeners.push({
               type: 'error',
               listener: function listener(evt) {
-                _this3.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'));
+                _this5.handleError(targetRoot, new Error('Loading srced element failed (FALLBACK ERROR MSG)'));
               }
             });
           }
@@ -1184,13 +1244,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }]);
 
     function DemandJS(options) {
-      var _this4 = this;
+      var _this6 = this;
 
       _classCallCheck(this, DemandJS);
 
       this.phRegistry = new WeakMap();
       this.injecting = new WeakMap();
       this.observed = new WeakMap();
+      this.queuedFuncs = [];
 
       var newHandlers = {};
       if (options && 'linkHandler' in options) {
@@ -1209,16 +1270,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         loadingHtml: this.defaultLoadingHtml,
         failureHtml: this.defaultFailureHtml,
         createLoadingNode: function createLoadingNode(t) {
-          return _this4.createLoadingNode(t);
+          return _this6.createLoadingNode(t);
         },
         createFailureNode: function createFailureNode(t, ex) {
-          return _this4.createFailureNode(t, ex);
+          return _this6.createFailureNode(t, ex);
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
         },
         shouldInsertOnLoad: function shouldInsertOnLoad(t) {
-          return _this4.options.shouldRemove(t);
+          return _this6.options.shouldRemove(t);
         },
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',
@@ -1228,16 +1289,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         thresholdOuter: 0.001,
         enableOffloading: false,
         onLoadBegin: function onLoadBegin(t) {
-          return _this4.onLoadBegin(t);
+          return _this6.onLoadBegin(t);
         },
         onLoadSuccess: function onLoadSuccess(t) {
-          return _this4.onLoadSuccess(t);
+          return _this6.onLoadSuccess(t);
         },
         onLoadFailure: function onLoadFailure(t, e) {
-          return _this4.onLoadFailure(t, e);
+          return _this6.onLoadFailure(t, e);
         },
         onLoadComplete: function onLoadComplete(t) {
-          return _this4.onLoadComplete(t);
+          return _this6.onLoadComplete(t);
         },
         alternatives: [],
         urlPerformance: {},
@@ -1249,17 +1310,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         linkHandler: {
           'text/html': function textHtml(t, c) {
-            return _this4.injectHtml(t, c);
+            return _this6.injectHtml(t, c);
           },
           'application/xhtml+xml': function applicationXhtmlXml(t, c) {
-            return _this4.injectHtml(t, c);
+            return _this6.injectHtml(t, c);
           }
         }
       }, options);
       this.options.linkHandler = Object.assign(this.options.linkHandler, newHandlers);
 
       this.mutation = new MutationObserver(function (a, b) {
-        return _this4.observeMutation(a, b);
+        return _this6.observeMutation(a, b);
       });
       this.mutationOptions = {
         childList: true,
@@ -1272,7 +1333,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         threshold: this.options.threshold
       };
       this.intersection = new IntersectionObserver(function (a, b) {
-        return _this4.observeIntersection(a, b);
+        return _this6.observeIntersection(a, b);
       }, this.intersectionOptions);
 
       if (this.options.enableOffloading) {
@@ -1282,12 +1343,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           threshold: this.options.thresholdOuter
         };
         this.outersection = new IntersectionObserver(function (a, b) {
-          return _this4.observeOutersection(a, b);
+          return _this6.observeOutersection(a, b);
         }, this.outersectionOptions);
       }
 
       this.attributeMutations = new MutationObserver(function (a, b) {
-        return _this4.observeAttributeMutation(a, b);
+        return _this6.observeAttributeMutation(a, b);
       });
       this.attributeMutationOptions = {
         attributes: true,

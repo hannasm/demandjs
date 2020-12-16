@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.8 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.9 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Acknowledgement
 
@@ -245,6 +245,7 @@ Demand classes are supported for all of the following options:
   * onLoadFailure ([see test019](test/test019.html))
   * previewLoading
   * previewFailure
+  * enableOffloading ([see test024](test/test024.html))
 
 ## Load Balancing
 
@@ -289,13 +290,18 @@ var options = {
 
 ## *Experimental* Resource Offloading
 
-Resource offloading is the process of removing images / other demand loaded elements from the page when they are no longer within view and are unneeded. This can help improve performance on pages with large amounts of content, and especially on resource constrained devices.
+Resource offloading is the process of removing images / other demand loaded elements from the page when they are no longer within view. This can help improve performance on pages with large amounts of content, and/or  on resource constrained devices.
 
-Resource offloading is also difficult because it can cause layout changes that will create jarring disruptions to the viewport and scroll position. The css of the page and the placeholder content used during off-loading must be designed in such a way that when off-loading, the page layout remains exactly the same after offloading as prior to offloading. The css and placeholder are both user-configurable and so it's not something demandjs can do without some help from the user.
+[See resource offloading test023](test/test023.html)
 
-Resource offloading is currently limited to img, picture, and video elements. Offloading large chunks of html, iframes, and other content will need to be adressed at a later time.
+Resource offloading can be complex because it may cause drastic and unexpected layout changes that can disrupt the users viewport and scroll position. The css of the page and the placeholder content injected during off-loading must be designed in such a way that the page layout remains nearly the same before and after offloading. The css and placeholder are both user-configurable and so demandjs can only do so much without getting help from the user. ([See test026 for a simple example](test/test026.html)
 
-If you would like to use offloading you must take some steps to make that offloading work properly. First and foremost you must enable this feature since it is disabled by default. Configuring margin and thresholds for the offloading operation might be appropriate but the defaults may be sufficient. Finally you must implement placeholders that accomodate the page layout when resources are offloaded. A couple of details are calculated for you during the offloading to make this process easier, but ultimately you must ensure that the placeholder fits in the space it is intended, and consumes the same amount off size as the original image did previously.
+Resource offloading is currently limited to img, picture, and video elements. Offloading large chunks of html, iframes, or other demand loaded content will need to be adressed at a later time if there is ever a need for it.
+
+If you would like to use offloading you must enable this feature since it is disabled by default. You may want to configure margin and thresholds for offloading, but the defaults may be sufficient. Finally you probably need to implement custom placeholders that accomodate your page layout, and you may want to use demand classes to help streamline this process. The width and height of the offloaded element is calculated and provided for you during the offloading operation to make custom placeholder code easier to create. 
+
+A example configuration: 
+
 
 ```javascript
 var options = {
@@ -303,50 +309,49 @@ var options = {
   rootMarginOuter: '2048px',
   thresholdOuter: 0.001,
   createLoadingNode: function (tgt, info) {
-		var ele = document.createElement('div');
-		ele.style.position = 'relative';
-		ele.style.top = '50%';
-    ele.style.bottom = '50%';
-		ele.style.zIndex = 100;
-		ele.style.color = '#FFF';
+		var placeholderRoot = document.createElement('div');
+		placeholderRoot.style.position = 'relative';
 
-		var mainEle = document.createElement('div');
-		mainEle.innerText = 'Loading in progress';
+		var loadingText = document.createElement('div');
+		loadingText.innerText = 'Loading in progress';
+    loadingText.style.height = '500px';
+		placeholderRoot.appendChild(loadingText);
 
 		if (info.isOffloading) {
-			var inner = mainEle;
 			var cvsSize = document.createElement('canvas');
 			cvsSize.width = info.demandWidth;
 			cvsSize.height = info.demandHeight;
-			cvsSize.style.backgroundColor = '#F00';
+      var cvsSizeCtx = cvsSize.getContext('2d');
+      cvsSizeCtx.fillStyle = '#F00';
+      cvsSizeCtx.fillRect(0,0,cvsSize.width,cvsSize.height);
 
-			mainEle = document.createElement('img');
-			mainEle.src = cvsSize.toDataURL('image/jpeg');
-			mainEle.className = 'nodemand';
+			var offloadImg = document.createElement('img');
+			offloadImg.src = cvsSize.toDataURL('image/jpeg');
+			offloadImg.className = 'nodemand';
+      placeholderRoot.appendChild(offloadImg);
 
-			inner.style.position = 'absolute';
-			inner.style.top = '50%';
-			inner.style.bottom = '50%';
-			inner.style.left = '50%';
-			inner.style.right = '50%';
-			inner.style.zIndex = 100;
-			inner.style.color = '#FFF';
-			ele.appendChild(inner);
+			loadingText.style.position = 'absolute';
+			loadingText.style.top = '10%';
+			loadingText.style.left = '10%';
+			loadingText.style.zIndex = 100;
+			loadingText.style.color = '#FFF';
 		}
 
-		ele.appendChild(mainEle);
-		return [ele];
+		return [placeholderRoot];
   }
 };
 ```
+(and also see [test025](test/test025.html))
 
 In the code snippet above, the property `info.isOffloading` is used to determine whether the placeholder is being created for an offloading operation instead of a normal placeholder. `info.demandWidth` and `info.demandHeight` represent the exact layout height and width of the elements being offloaded. 
 
 The placeholder is a div with the text 'Loading In Progress'. However when offloading, we take extra steps to generate a placeholder that will layout with the same dimensions as the offloaded image by rendering a canvas of the appropriate size. 
 
-There are likely other solutions to proper offloading placeholders, based on your page design, but this example should be useful as a starting point.
+There are likely other solutions to proper offloading placeholders for your page design, but this example should be useful as a starting point.
 
 Debugging offloaded layout issues is frustrating and tricky because you are trying to address details and events that are ocurring off screen. At least in a chrome browser with developer console, it is possible to set a breakpoint during a particular offloading operation and then inspect the dom / observe the page layout with the javascript code paused. You will ultimately have to improvise your own approach to finding and fixing issues.
+
+Resource offloading supports demand classes [see test024](test/test024.html)
 
 See the configuration section below for some additional details about the configuration options available.
 
@@ -378,7 +383,7 @@ See the configuration section below for some additional details about the config
   | maxPerformanceRecords | defines the number of requests to average over for calculating load balancer predictions, a larger number will be less forgiving to slow servers | 7 | no |
   | retryOnError | when set to true, attempt to retry failed requests instead of giving up | true | yes |
   | maxRetries | maximum number of times to retry before giving up | 2 | yes |
-  | enableOffloading | when true, enables an experimental feature which removes demand loaded resources from the DOM when they are scrolled sufficiently out of view, allowing browser garbage collection. This functionality is still experimental | false | no |
+  | enableOffloading | when true, enables an experimental feature which removes demand loaded resources from the DOM when they are scrolled sufficiently out of view, allowing browser garbage collection. This functionality is still experimental | false | yes |
   | rootMarginOuter | similar to root margin but defines the region outside of which elements are offloaded. this should be significantly larger the rootMargin, but ideal settings aren't quite clear yet | 2048px | no |
   | thresholdOuter | similar to threshold but defines the visibility threshold outside of which elements are offloaded | 0.001 | no |
 
@@ -445,9 +450,15 @@ It should be fairly easy to make assertions using some combination of properties
 * [test020](test/test020.html)
 * [test021](test/test021.html)
 * [test022](test/test022.html)
+* [test023](test/test023.html)
+* [test024](test/test024.html)
+* [test025](test/test025.html)
+* [test026](test/test026.html)
 
 ## Release Notes 
 
+* 1.0.0-rc.9 - demand classes for resource offloading
+* 1.0.0-rc.9 - better cooperative multitasking behavior
 * 1.0.0-rc.8 - flushing out resource offloading functionality to some more practical use cases identified through experience
 * 1.0.0-rc.7 - retry on failed requests, potentially using load balacning to attepmt alternative urls, with exponential backoff delays
 * 1.0.0-rc.7 - add ability to setup load balancing of requests across multiple domains, which domain is used is based on performance so can also serve as a poor mans version of serving the same files from the nearest region

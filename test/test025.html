@@ -1,0 +1,60 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {i
+        var cls = '';
+        if (i%3 == 0) {
+          cls = 'data-demand="spinner" ';
+        } else if (i%3 == 1) {
+          cls = 'data-demand="progress" ';
+        }
+
+        document.write('<div><img src="' + window.test_images[i] + '" ' + cls + '/></div><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var options = {
+        enableOffloading: true,
+        rootMarginOuter: '2048px',
+        thresholdOuter: 0.1,
+        createLoadingNode: function (tgt, info) {
+          var placeholderRoot = document.createElement('div');
+          placeholderRoot.style.position = 'relative';
+
+          var loadingText = document.createElement('div');
+          loadingText.innerText = 'Loading in progress';
+          loadingText.style.height = '500px';
+          placeholderRoot.appendChild(loadingText);
+
+          if (info.isOffloading) {
+            var cvsSize = document.createElement('canvas');
+            cvsSize.width = info.demandWidth;
+            cvsSize.height = info.demandHeight;
+            var cvsSizeCtx = cvsSize.getContext('2d');
+            cvsSizeCtx.fillStyle = '#F00';
+            cvsSizeCtx.fillRect(0,0,cvsSize.width,cvsSize.height);
+
+            var offloadImg = document.createElement('img');
+            offloadImg.src = cvsSize.toDataURL('image/jpeg');
+            offloadImg.className = 'nodemand';
+            placeholderRoot.appendChild(offloadImg);
+
+            loadingText.style.position = 'absolute';
+            loadingText.style.top = '10%';
+            loadingText.style.left = '10%';
+            loadingText.style.zIndex = 100;
+            loadingText.style.color = '#FFF';
+          }
+
+          return [placeholderRoot];
+        }
+      };
+      window.DemandJSDemanded = new DemandJS(options);
+    </script>
+  </body>
+</html>

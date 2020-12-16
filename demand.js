@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.8
+/** @preserve DemandJS - v.1.0.0-rc.9
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -139,7 +139,27 @@
         }
       }
     }
+    cooperativeExecute() {
+      var func = this.queuedFuncs.shift();
+      func();
+      if (this.queuedFuncs.length > 0) {
+        var self = this;
+        setTimeout(function() {
+          self.cooperativeExecute();
+        }, 0);
+      }
+    }
+    cooperativeQueue(funcFactory) {
+      this.queuedFuncs.push(funcFactory());
+      if (this.queuedFuncs.length === 1) {
+        var self = this;
+        setTimeout(function() {
+          self.cooperativeExecute();
+        }, 0);
+      }
+    }
     observeIntersection(intersections) {
+      var self = this;
       for (var i = 0; i < intersections.length; i++) {
         var intersect = intersections[i];
         if (intersect.isIntersecting && intersect.intersectionRatio > 0) { 
@@ -147,11 +167,18 @@
           if (reg === undefined || reg.loading) { continue; }
           reg = this.phRegistry.get(reg.target);
           if (reg === undefined || reg.loading) { continue; }
-          this.beginLoad(reg);   
+
+          this.cooperativeQueue(function() {
+            var reg2 = reg;
+            return function () {
+              self.beginLoad(reg2);   
+            }
+          });
         }
       }
     }
     observeOutersection(intersections) {
+      var self = this;
       for (var i = 0; i < intersections.length; i++) {
         var intersect = intersections[i];
         if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) { 
@@ -164,12 +191,19 @@
           var dims = target.getBoundingClientRect();
           target.setAttribute('data-demandjs-width', dims.width);
           target.setAttribute('data-demandjs-height', dims.height);
-          this.cleanupRegistrationTarget(target);
 
-          var mc = this.isTargetMatch(target);
-          if (mc.isMatch) {
-            this.observeTarget(target, reg);
-          }
+          this.cooperativeQueue(function() {
+            var target2 = target;
+            var reg2 = reg;
+            return function () {
+              self.cleanupRegistrationTarget(target2);
+
+              var mc = self.isTargetMatch(target2);
+              if (mc.isMatch) {
+                self.observeTarget(target2, reg2);
+              }
+            }
+          });
         }
       }
     }
@@ -297,13 +331,22 @@
         }
       }
     }
+    isOffloadingEnabled(target) {
+      return this.selectByDemandClass(
+        target,
+        this.options.enableOffloading,
+        this.options.demandClassAttribute,
+        this.options.defaultDemandClass,
+        false
+      );
+    }
     shouldTrackOffloading(target) {
       if (target.nodeName !== 'IMG' &&
         target.nodeName !== 'VIDEO' &&
         target.nodeName !== 'PICTURE') {
         return false;
       }
-      return this.options.enableOffloading;
+      return this.isOffloadingEnabled(target);
     }
     processSuccess(target) {
       var {target, registration} = this.resolveTarget(target);
@@ -376,14 +419,12 @@
       registration.placeholders = [];
     }
     scrollSave() {
-      this.scrollSaveData = {
-        x: window.pageXOffset,
-        y: window.pageYOffset
-      };
+      // when we saved off window scroll offsets and they were later restored after modifying the dom, it really caused major headaches
+      return;
     }
     scrollRestore() {
+      // when we saved off window scroll offsets and they were later restored after modifying the dom, it really caused major headaches
       return;
-      window.scrollTo(this.scrollSaveData.x, this.scrollSaveData.y);
     }
 
     cleanupPlaceholder(placeholder, removeFromTarget) {
@@ -415,7 +456,7 @@
       this.observed.delete(target);
       this.injecting.delete(target);
       this.intersection.unobserve(target); // this only necesarry when we didnt remove the item
-      if (this.options.enableOffloading) {
+      if (this.isOffloadingEnabled(target)) {
         this.outersection.unobserve(target);
       }
       this.phRegistry.delete(target);
@@ -1016,6 +1057,7 @@
       this.phRegistry = new WeakMap();
       this.injecting = new WeakMap();
       this.observed = new WeakMap();
+      this.queuedFuncs = [];
 
       let newHandlers = {};
       if (options && 'linkHandler' in options) {
