@@ -457,6 +457,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.10 - various minor code cleanup and error handling fixes
 * 1.0.0-rc.9 - demand classes for resource offloading
 * 1.0.0-rc.9 - better cooperative multitasking behavior
 * 1.0.0-rc.8 - flushing out resource offloading functionality to some more practical use cases identified through experience
