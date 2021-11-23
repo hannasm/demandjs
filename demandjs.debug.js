@@ -6,7 +6,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.9
+/** @preserve DemandJS - v.1.0.0-rc.10
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -197,8 +197,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }, {
       key: 'cooperativeQueue',
-      value: function cooperativeQueue(funcFactory) {
-        this.queuedFuncs.push(funcFactory());
+      value: function cooperativeQueue(func) {
+        this.queuedFuncs.push(func);
         if (this.queuedFuncs.length === 1) {
           var self = this;
           setTimeout(function () {
@@ -211,11 +211,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       value: function observeIntersection(intersections) {
         var _this = this;
 
+        var self = this;
         for (var i = 0; i < intersections.length; i++) {
           var intersect = intersections[i];
           if (intersect.isIntersecting && intersect.intersectionRatio > 0) {
-            var self;
-
             var _ret = function () {
               var reg = _this.phRegistry.get(intersect.target);
               if (reg === undefined || reg.loading) {
@@ -226,13 +225,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                 return 'continue';
               }
 
-              self = _this;
-
               _this.cooperativeQueue(function () {
-                var reg2 = reg;
-                return function () {
-                  self.beginLoad(reg2);
-                };
+                self.beginLoad(reg);
               });
             }();
 
@@ -245,13 +239,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       value: function observeOutersection(intersections) {
         var _this2 = this;
 
+        var self = this;
         for (var i = 0; i < intersections.length; i++) {
           var intersect = intersections[i];
           if (!intersect.isIntersecting || intersect.intersectionRatio <= 0) {
-            var target;
-            var dims;
-            var self;
-
             var _ret2 = function () {
               var reg = _this2.phRegistry.get(intersect.target);
               if (reg === undefined) {
@@ -264,25 +255,19 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               if (!reg.loaded) {
                 return 'continue';
               }
-              target = reg.target;
-              dims = target.getBoundingClientRect();
+              var target = reg.target;
 
+              var dims = target.getBoundingClientRect();
               target.setAttribute('data-demandjs-width', dims.width);
               target.setAttribute('data-demandjs-height', dims.height);
 
-              self = _this2;
-
               _this2.cooperativeQueue(function () {
-                var target2 = target;
-                var reg2 = reg;
-                return function () {
-                  self.cleanupRegistrationTarget(target2);
+                self.cleanupRegistrationTarget(target);
 
-                  var mc = self.isTargetMatch(target2);
-                  if (mc.isMatch) {
-                    self.observeTarget(target2, reg2);
-                  }
-                };
+                var mc = self.isTargetMatch(target);
+                if (mc.isMatch) {
+                  self.observeTarget(target, reg);
+                }
               });
             }();
 
@@ -299,6 +284,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             target = _resolveTarget3.target,
             registration = _resolveTarget3.registration;
 
+        if (registration.loading) {
+          return;
+        }
         registration.loading = true;
         if (registration.extraData.shouldInjectLink) {
           var url = registration.extraData.href;
@@ -327,7 +315,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             return _this3.restoreTarget(registration);
           }, 0);
         } else {
-          throw 'Unknown load operation';
+          console.warn('DEMANDJS: unknown load operation - ignored');
         }
       }
     }, {
@@ -360,7 +348,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           var handler = this.options.linkHandler[type];
           handler(target, txt);
         } else {
-          throw 'Unknown link demand with content type: ' + type;
+          console.warn('DEMANDJS: Unknown link demand with content type: ' + type);
         }
         this.processSuccess(registration);
       }
@@ -380,8 +368,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           });
           localScriptId = bc.src + '#' + localScriptId;
         }
-        codePromise.then(function (code) {
+        codePromise = codePromise.then(function (code) {
           _this4.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
+        });
+        codePromise = codePromise.catch(function (ex) {
+          _this4.handleError(bc, ex);
         });
       }
     }, {
@@ -427,7 +418,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             this.scrollSave();
             target.parentNode.insertBefore(bc, target);
             this.scrollRestore();
-            registration.elements.push(bc);
+            if (registration && registration.elements) {
+              registration.elements.push(bc);
+            }
           }
         }
       }
@@ -514,11 +507,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scrollSave',
       value: function scrollSave() {
+        // when we saved off window scroll offsets and they were later restored after modifying the dom, it really caused major headaches
         return;
       }
     }, {
       key: 'scrollRestore',
       value: function scrollRestore() {
+        // when we saved off window scroll offsets and they were later restored after modifying the dom, it really caused major headaches
         return;
       }
     }, {

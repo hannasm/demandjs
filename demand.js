@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.9
+/** @preserve DemandJS - v.1.0.0-rc.10
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -149,8 +149,8 @@
         }, 0);
       }
     }
-    cooperativeQueue(funcFactory) {
-      this.queuedFuncs.push(funcFactory());
+    cooperativeQueue(func) {
+      this.queuedFuncs.push(func);
       if (this.queuedFuncs.length === 1) {
         var self = this;
         setTimeout(function() {
@@ -168,11 +168,8 @@
           reg = this.phRegistry.get(reg.target);
           if (reg === undefined || reg.loading) { continue; }
 
-          this.cooperativeQueue(function() {
-            var reg2 = reg;
-            return function () {
-              self.beginLoad(reg2);   
-            }
+          this.cooperativeQueue(function () {
+            self.beginLoad(reg);   
           });
         }
       }
@@ -187,21 +184,18 @@
           reg = this.phRegistry.get(reg.target);
           if (reg === undefined) { continue; }
           if (!reg.loaded) { continue; }
-          var target = reg.target;
-          var dims = target.getBoundingClientRect();
+          let target = reg.target;
+
+          let dims = target.getBoundingClientRect();
           target.setAttribute('data-demandjs-width', dims.width);
           target.setAttribute('data-demandjs-height', dims.height);
 
           this.cooperativeQueue(function() {
-            var target2 = target;
-            var reg2 = reg;
-            return function () {
-              self.cleanupRegistrationTarget(target2);
+            self.cleanupRegistrationTarget(target);
 
-              var mc = self.isTargetMatch(target2);
-              if (mc.isMatch) {
-                self.observeTarget(target2, reg2);
-              }
+            let mc = self.isTargetMatch(target);
+            if (mc.isMatch) {
+              self.observeTarget(target, reg);
             }
           });
         }
@@ -209,6 +203,7 @@
     }
     beginLoad(target) {
       var {target, registration} = this.resolveTarget(target);
+      if (registration.loading) { return; }
       registration.loading = true;
       if (registration.extraData.shouldInjectLink) {
         let url = registration.extraData.href;
@@ -239,7 +234,7 @@
         // setTimeout helps keep loading animations smooth
         setTimeout(()=>this.restoreTarget(registration), 0);
       } else {
-        throw 'Unknown load operation';
+        console.warn('DEMANDJS: unknown load operation - ignored')
       }
     }
     isResourceLoaded(target) {
@@ -272,7 +267,7 @@
         var handler = this.options.linkHandler[type];
         handler(target, txt);
       } else {
-        throw 'Unknown link demand with content type: ' + type;
+        console.warn('DEMANDJS: Unknown link demand with content type: ' + type);
       }
       this.processSuccess(registration);
     }
@@ -288,9 +283,12 @@
         });
         localScriptId = bc.src + '#' + localScriptId;
       }
-      codePromise.then(code=>{
+      codePromise = codePromise.then(code=>{
         this.injectScript(bc, injecting.href + '.demand[' + localScriptId + '].js', code);
       });
+      codePromise = codePromise.catch(ex=>{
+          this.handleError(bc, ex);
+        });
     }
     injectScript(target, id, code) {
       var oldDw = document.write;
@@ -327,7 +325,9 @@
           this.scrollSave();
           target.parentNode.insertBefore(bc, target);
           this.scrollRestore();
-          registration.elements.push(bc);
+          if (registration && registration.elements) {
+            registration.elements.push(bc);
+          }
         }
       }
     }
