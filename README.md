@@ -17,6 +17,12 @@ DemandJS provides lazy loading of resources as they scroll into view using true 
 
 Loading resources on demand can drastically reduce initial page load times and perceived page performance.
 
+## Installation
+
+The minified and optimized, release version of this library is checked into the repository as [demandjs.min.js](https://raw.githubusercontent.com/hannasm/demandjs/master/demandjs.min.js). For specific versions you can also check the [Release Page](https://github.com/hannasm/demandjs/releases)
+
+There are no dependencies however refer to the polyfill section below for some specific compaibility considerations.
+
 ## Best Practices
 
 * It is important that your loading elements are approximately the same dimensions as your actual content. DemandJS replaces your actual content with loading elements (e.g. loading anmiation). When the loading element becomes visible on the page, demandjs will begin loading your actual content. If the loading element is significantly smaller than the actual content, and several are clumped together in the layout, loading may start earlier than was actually needed. If your loading elements are significantly larger than your actual content, and several are clumped together, inserting your actual content into the page may lead to other loading elements popping into view, and hence additional loads happening later than intended.
