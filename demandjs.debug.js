@@ -226,6 +226,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               }
 
               _this.cooperativeQueue(function () {
+                if (reg.extraData.isOffloadingPending) {
+                  return;
+                }
+
                 self.beginLoad(reg);
               });
             }();
@@ -258,12 +262,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               var target = reg.target;
 
               var dims = target.getBoundingClientRect();
+
+              // if the element has no dimensions treat it as if it hasn't actually loaded yet
+              if (dims.width != 0 && dims.height != 0) {
+                return 'continue';
+              }
+
               target.setAttribute('data-demandjs-width', dims.width);
               target.setAttribute('data-demandjs-height', dims.height);
+              reg.extraData.isOffloadingPending = true;
 
               _this2.cooperativeQueue(function () {
                 self.cleanupRegistrationTarget(target);
-
                 var mc = self.isTargetMatch(target);
                 if (mc.isMatch) {
                   self.observeTarget(target, reg);
@@ -309,7 +319,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }).catch(function (ex) {
             _this3.handleError(registration, ex);
           });
-        } else if (registration.extraData.shouldRestore) {
+        } else if (registration && registration.extraData && registration.extraData.shouldRestore) {
           // setTimeout helps keep loading animations smooth
           setTimeout(function () {
             return _this3.restoreTarget(registration);
@@ -787,7 +797,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }, {
       key: '_restoreTargetInternal',
-      value: function _restoreTargetInternal(target, extraData) {
+      value: function _restoreTargetInternal(target, extraData, shouldNotPredictUrl) {
+        if (shouldNotPredictUrl === undefined) {
+          shouldNotPredictUrl = false;
+        }
+
         if (extraData.hasSrcset) {
           target.setAttribute('srcset', extraData.srcset);
         }
@@ -795,12 +809,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           target.setAttribute('sizes', extraData.sizes);
         }
         if (extraData.hasSrc) {
-          target.setAttribute('src', this.predictUrl(target, extraData.src));
+          var src = extraData.src;
+          if (!shouldNotPredictUrl) {
+            src = this.predictUrl(target, src);
+          }
+          target.setAttribute('src', src);
         }
         if (extraData.children.length > 0) {
           for (var i = 0; i < extraData.children.length; i++) {
             var childData = extraData.children[i];
-            this._restoreTargetInternal(childData.target, childData);
+            this._restoreTargetInternal(childData.target, childData, shouldNotPredictUrl);
           }
         }
 
@@ -859,6 +877,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           'performancePrediction': {}
         };
         // The assumption is that this is the only way these attribute can be defined, somebody could potentially set these attributes manually and this would violate that assumption
+        // the loading graphic should take these width / height values and use them to consume space in the layout if available
         store.isOffloading = store.hasDemandWidth || store.hasDemandHeight;
         this.clearAttributes(target, store);
 
@@ -1057,10 +1076,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         this.getPerformanceRecord(bestUrl).currentUsage += bestSpeed;
-        registration.extraData.performancePrediction = {
-          prefix: bestUrl,
-          speed: bestSpeed
-        };
+        if (registration && registration.extraData) {
+          registration.extraData.performancePrediction = {
+            prefix: bestUrl,
+            speed: bestSpeed
+          };
+        } else {
+          console.warn('unable to track perf in predictUrl with url=' + url);
+        }
 
         return bestUrl + suffix;
       }
@@ -1136,6 +1159,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         } else if (this.isContextExcluded(target)) {
           // do nothing, another element should take care of it
         } else {
+          if (oldRegistration !== undefined) {
+            this._restoreTargetInternal(target, oldRegistration.extraData, true);
+          }
           var store = this.captureTarget(target, target);
 
           var createLoadingNode = this.selectByDemandClass(target, this.options.createLoadingNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createLoadingNode);
