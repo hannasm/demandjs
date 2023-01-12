@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.9 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.10 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Acknowledgement
 
@@ -457,7 +457,7 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
-* 1.0.0-rc.10 - various minor code cleanup and error handling fixes
+* 1.0.0-rc.10 - various minor code cleanup and error handling fixes, fixes to offloading
 * 1.0.0-rc.9 - demand classes for resource offloading
 * 1.0.0-rc.9 - better cooperative multitasking behavior
 * 1.0.0-rc.8 - flushing out resource offloading functionality to some more practical use cases identified through experience
