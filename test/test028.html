@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {
+        document.write('<iframe class="demand" src="test028_subpage.html"></iframe><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var options = {
+        /*
+          YMMV - but - in chrome as of 20230216 - this causes iframes to render incorrectly
+        shouldInsertToLoad: function (tgt) {
+          return false;
+        }*/
+      };
+      var djs = new DemandJS(options);
+    </script>
+  </body>
+</html>

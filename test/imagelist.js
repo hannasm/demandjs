@@ -30,6 +30,15 @@
     'https://images.unsplash.com/photo-1452993912631-49cff82efb5e',
     'https://images.unsplash.com/photo-1437419764061-2473afe69fc2'
   ];
+
+  window.test_videos = [
+    'https://wedistill.io/uploads/videos/processed/1716/Northernlights2_HD.mp4.mp4',
+    'https://wedistill.io/uploads/videos/processed/33/Cold2520Winter2520Dream-HD3_1.mp4.mp4',
+    'https://wedistill.io/uploads/videos/processed/1637/flow_in_the_sky.mp4',
+    'https://wedistill.io/uploads/videos/processed/34/State-Fair-2013-HD.mp4.mp4',
+    'https://wedistill.io/uploads/videos/processed/757/girlbythesea.mp4.mp4',
+    'https://wedistill.io/uploads/videos/processed/803/citylifestyle.mp4.mp4'
+  ];
   window.error_images=[];
   for (var i = 0;  i < window.test_images.length; i++) {
     window.error_images.push(window.test_images[i].replace('images', 'doesnotexist'));

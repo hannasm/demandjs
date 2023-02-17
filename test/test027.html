@@ -2,10 +2,19 @@
   <head>
     <link rel='stylesheet' type="text/css" href='base.css' />
     <script src='imagelist.js'></script>
+<style type="text/css">
+  video {
+    margin-top: 5em;
+    margin-bottom: 5em;
+    border: 1px solid #F00;
+    height: 1024px;
+  }
+</style>
   </head>
   <body>
+    <form>
     <script type="text/javascript">
-      for (var i = 0; i < window.test_images.length; i++) {i
+      for (var i = 0; i < window.test_videos.length; i++) {i
         var cls = '';
         if (i%3 == 0) {
           cls = 'data-demand="spinner" ';
@@ -13,7 +22,7 @@
           cls = 'data-demand="progress" ';
         }
 
-        document.write('<img src="' + window.test_images[i] + '" ' + cls + '/><br/>');
+        document.write('<video controls><source type="video/mp4" src="' + window.test_videos[i] + '" ' + cls + ' /></video><br/>');
       }
     </script>
     <script src="../demandjs.debug.js"></script>
@@ -22,10 +31,14 @@
         enableOffloading: true,
         rootMarginOuter: '2048px',
         thresholdOuter: 0.1,
+        /*
+          YMMV - but - in chrome as of 20230216 - this causes videos to render incorrectly
+        shouldInsertToLoad: function (tgt) {
+          return false;
+        }*/
         createLoadingNode: function (tgt, info) {
           var placeholderRoot = document.createElement('div');
           placeholderRoot.style.position = 'relative';
-          placeholderRoot.style.display = 'inline-block';
 
           var loadingText = document.createElement('div');
           loadingText.innerText = 'Loading in progress';
@@ -46,6 +59,8 @@
             placeholderRoot.appendChild(offloadImg);
 
             loadingText.style.position = 'absolute';
+            loadingText.style.top = '10%';
+            loadingText.style.left = '10%';
             loadingText.style.zIndex = 100;
             loadingText.style.color = '#FFF';
           }
@@ -55,5 +70,6 @@
       };
       window.DemandJSDemanded = new DemandJS(options);
     </script>
+    </form>
   </body>
 </html>

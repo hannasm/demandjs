@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.10
+/** @preserve DemandJS - v.1.0.0-rc.11
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -194,7 +194,7 @@
           // if the element has no dimensions treat it as if it hasn't actually loaded yet because
           // offloaded images need to use these dimensions to preserve the same page layout when swapping
           // in the unloaded graphics
-          if (dims.width != 0 && dims.height != 0) { continue; }
+          if (dims.width == 0 || dims.height == 0) { continue; }
 
           target.setAttribute('data-demandjs-width', dims.width);
           target.setAttribute('data-demandjs-height', dims.height);
@@ -472,7 +472,7 @@
       registration.extraData.listeners.forEach(l=>target.removeEventListener(l.type, l.listener));
       for (var i = 0; i < registration.extraData.children.length; i++) {
         var child = registration.extraData.children[i];
-        this.releaseTarget(child, targetRoot);
+        this.cleanupRegistrationTarget(child);
       }
       var self = this;
       registration.elements.forEach(e=>{
@@ -508,10 +508,10 @@
         target.style.display = 'none';
       }
 
+      this.cleanupPlaceholders(registration);
       onLoadFailure.call(this, target, ex);
 
       // remove placeholders
-      this.cleanupPlaceholders(registration);
 
       registration.loaded = true;
       registration.extraData.endTime = performance.now();
@@ -646,6 +646,7 @@
         retryCount: 0
       };
       this.phRegistry.set(node, result);
+      this.observed.set(node, true);
       return result;
     }
     hasRegistration(target) {
@@ -689,6 +690,18 @@
       if (shouldNotPredictUrl === undefined) {
         shouldNotPredictUrl = false;
       }
+
+      if (extraData.hasDemandWidth) {
+        target.removeAttribute("data-demandjs-width");
+        delete extraData.hasDemandWidth;
+        delete extraData.demandWidth;
+      }
+      if (extraData.hasDemandHeight) {
+        target.removeAttribute("data-demandjs-height");
+        delete extraData.hasDemandHeight;
+        delete extraData.demandHeight;
+      }
+      extraData.isOffloading = false;
 
       if (extraData.hasSrcset) {
         target.setAttribute('srcset', extraData.srcset);
@@ -740,7 +753,7 @@
         'hasSizes': target.hasAttribute('sizes'),
         'sizes': target.getAttribute('sizes'),
         'isLink': ('tagName' in target) && (target.tagName.match(/link/i)),
-        'insertToLoad': ('tagName' in target) && (target.tagName.match(/iframe/i)),
+        'insertToLoad': this.options.shouldInsertToLoad(target),
         'hasHref': target.hasAttribute('href'),
         'href': target.getAttribute('href'),
         'hasType': target.hasAttribute('type'),
@@ -836,6 +849,7 @@
           var desc = this.captureTarget(child, targetRoot);
           desc.index = i;
           store.children.push(desc);
+          this.registerPlaceholder(child, child, [], desc);
         }
       }
 
@@ -1103,6 +1117,19 @@
         createFailureNode: (t,ex)=>this.createFailureNode(t, ex),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
+        shouldInsertToLoad: t=> {
+          if (!('tagName' in t)) { return false; }
+          if (t.tagName.match(/iframe/i)) { return true; }
+
+          if (t.tagName.match(/video/i)) {
+            for (let ci = 0; ci < t.children.length; ci++) {
+              let e = t.children[ci];
+              if ('tagName' in e && e.tagName.match(/source/i)) { return true; }
+            }
+          }
+
+          return false;
+        },
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',
         rootMargin: '256px',

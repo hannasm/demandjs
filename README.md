@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.10 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.11 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Acknowledgement
 
@@ -35,11 +35,15 @@ There are no dependencies however refer to the polyfill section below for some s
 
 ## Usage
 
-To get up and running with demandJS you simply import the file into your page and instantiate it:
+To get up and running with demandJS you simply import the file into your page and instantiate it: 
+
 
 ```javascript
 window.DemandJSDemanded = new DemandJS();
 ```
+
+  * ([see test001](test/test001.html)) 
+  * ([see test002](test/test002.html))
 
 the default options will capture all img, video, picture, iframe in the page, cancel anything that may have been loading already, replace those elements with a boilerplate loading text, and then load those resources when they are actually needed
 
@@ -54,6 +58,8 @@ the default options will also capture link tags with a class of 'demand'. A link
 ```html
 <link rel="prefetch" class="demand" href="otherPage.html" type="text/html" />
 ```
+
+  * ([see test003](test/test003.html))
 
 DemandJS monitors the DOM for changes and any matching elements added to the page will automatically be captured and handled in the same way as elements that were already on the page. This means that all of your dynamic UI will automatically be configured to load on demand as well.
 
@@ -129,6 +135,8 @@ Reference: https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types
 Errors during resource loading are reported and handled by default through the ```failureHtml``` property by removing the content
 that failed to load, and replacing it with a html element with a bright red background and white text ```ERROR```. This
 content can be configured by setting the ```failureHtml``` property on the options.
+
+ ([see test008](test/test008.html))
 
 A simple customization is shown below:
  ([see test009](test/test009.html))
@@ -267,6 +275,7 @@ var options = {
   ]
 };
 ```
+  * ([see test022](test/test022.html))
 
 This sample configuration defines two groupings. The first grouping would match any resources to urls for http://img1.somesite.com or http://img2.somesite.com. Any resource that is affected by demandjs and starts with either of these url prefixes could potentially end up being requested to either of those addresses. The second grouping matches http://somesite.com/static/ and http://img3.somesite.com and the same rules apply, any resources thet start with either prefix could end up being requested from any of the urls.
 
@@ -293,6 +302,38 @@ var options = {
   maxRetries: 2
 };
 ```
+
+## ShouldInsertToLoad
+
+There seem to be a few cases that struggle with the default behavior of demandjs, which leaves existing html elements in the DOM, and uses a combination of a css style `display: none` and dynamically changing the src / srcset attributes of the elements in question to control when content is loaded.
+
+An alternative behavior in these cases is to remove the element from the DOM entirely, and perform an insert only when the content is actually ready to be loaded. This seems to work better for these particular elements at the cost of slightly more DOM manipulation and potential screen popping issues.
+
+For example:
+  * iframes don't actually fetch their content if dynamically changing src element once inserted into the dom ([See test028](test/test028.html))
+  * video elements with source children don't resolve and render a video when their src content is dynamically assigned after they are in the dom ([See test027](test/test027.html))
+
+An option `shouldInsertToLoad` is available to configure which elements should undergo this alternative behavior. The default function is shown below, which specifically targets iframes and videos containing source children.
+
+```javascript
+  var options = {
+    shouldInsertToLoad: t=> {
+      if (!('tagName' in t)) { return false; }
+      if (t.tagName.match(/iframe/i)) { return true; }
+
+      if (t.tagName.match(/video/i)) {
+        for (let ci = 0; ci < t.children.length; ci++) {
+          let e = t.children[ci];
+          if ('tagName' in e && e.tagName.match(/source/i)) { return true; }
+        }
+      }
+
+      return false;
+    }
+  }
+```
+
+If you identify any other cases where this alternative behavior is needed please report it using an issue!
 
 ## *Experimental* Resource Offloading
 
@@ -392,6 +433,7 @@ See the configuration section below for some additional details about the config
   | enableOffloading | when true, enables an experimental feature which removes demand loaded resources from the DOM when they are scrolled sufficiently out of view, allowing browser garbage collection. This functionality is still experimental | false | yes |
   | rootMarginOuter | similar to root margin but defines the region outside of which elements are offloaded. this should be significantly larger the rootMargin, but ideal settings aren't quite clear yet | 2048px | no |
   | thresholdOuter | similar to threshold but defines the visibility threshold outside of which elements are offloaded | 0.001 | no |
+  | shouldInsertToLoad | `function (target) {}` - this is called on each element as it is being captured and if returns true causes demandjs to remove the element from the DOM while it is off the screen, and insert it into the dom just before it would scroll into view. This is useful for certain elements like iframes and videos with source children that may have browser bugs or otherwise cause adverse side affects if left in the dom while not visible.  | iframe and video containg children will be insertToLoad, all others not | no |
 
 
 ## Polyfill Dependencies
@@ -460,9 +502,12 @@ It should be fairly easy to make assertions using some combination of properties
 * [test024](test/test024.html)
 * [test025](test/test025.html)
 * [test026](test/test026.html)
+* [test027](test/test027.html)
+* [test028](test/test028.html)
 
 ## Release Notes 
 
+* 1.0.0-rc.11 - bug fixes, more tests
 * 1.0.0-rc.10 - various minor code cleanup and error handling fixes, fixes to offloading
 * 1.0.0-rc.9 - demand classes for resource offloading
 * 1.0.0-rc.9 - better cooperative multitasking behavior

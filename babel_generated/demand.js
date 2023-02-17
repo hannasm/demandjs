@@ -6,7 +6,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.10
+/** @preserve DemandJS - v.1.0.0-rc.11
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -263,8 +263,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
               var dims = target.getBoundingClientRect();
 
-              // if the element has no dimensions treat it as if it hasn't actually loaded yet
-              if (dims.width != 0 && dims.height != 0) {
+              // if the element has no dimensions treat it as if it hasn't actually loaded yet because
+              // offloaded images need to use these dimensions to preserve the same page layout when swapping
+              // in the unloaded graphics
+              if (dims.width == 0 || dims.height == 0) {
                 return 'continue';
               }
 
@@ -576,7 +578,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         });
         for (var i = 0; i < registration.extraData.children.length; i++) {
           var child = registration.extraData.children[i];
-          this.releaseTarget(child, targetRoot);
+          this.cleanupRegistrationTarget(child);
         }
         var self = this;
         registration.elements.forEach(function (e) {
@@ -615,10 +617,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           target.style.display = 'none';
         }
 
+        this.cleanupPlaceholders(registration);
         onLoadFailure.call(this, target, ex);
 
         // remove placeholders
-        this.cleanupPlaceholders(registration);
 
         registration.loaded = true;
         registration.extraData.endTime = performance.now();
@@ -751,6 +753,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           retryCount: 0
         };
         this.phRegistry.set(node, result);
+        this.observed.set(node, true);
         return result;
       }
     }, {
@@ -801,6 +804,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         if (shouldNotPredictUrl === undefined) {
           shouldNotPredictUrl = false;
         }
+
+        if (extraData.hasDemandWidth) {
+          target.removeAttribute("data-demandjs-width");
+          delete extraData.hasDemandWidth;
+          delete extraData.demandWidth;
+        }
+        if (extraData.hasDemandHeight) {
+          target.removeAttribute("data-demandjs-height");
+          delete extraData.hasDemandHeight;
+          delete extraData.demandHeight;
+        }
+        extraData.isOffloading = false;
 
         if (extraData.hasSrcset) {
           target.setAttribute('srcset', extraData.srcset);
@@ -858,7 +873,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           'hasSizes': target.hasAttribute('sizes'),
           'sizes': target.getAttribute('sizes'),
           'isLink': 'tagName' in target && target.tagName.match(/link/i),
-          'insertToLoad': 'tagName' in target && target.tagName.match(/iframe/i),
+          'insertToLoad': this.options.shouldInsertToLoad(target),
           'hasHref': target.hasAttribute('href'),
           'href': target.getAttribute('href'),
           'hasType': target.hasAttribute('type'),
@@ -961,6 +976,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             var desc = this.captureTarget(child, targetRoot);
             desc.index = i;
             store.children.push(desc);
+            this.registerPlaceholder(child, child, [], desc);
           }
         }
 
@@ -1301,6 +1317,25 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         },
         shouldInsertOnLoad: function shouldInsertOnLoad(t) {
           return _this6.options.shouldRemove(t);
+        },
+        shouldInsertToLoad: function shouldInsertToLoad(t) {
+          if (!('tagName' in t)) {
+            return false;
+          }
+          if (t.tagName.match(/iframe/i)) {
+            return true;
+          }
+
+          if (t.tagName.match(/video/i)) {
+            for (var ci = 0; ci < t.children.length; ci++) {
+              var e = t.children[ci];
+              if ('tagName' in e && e.tagName.match(/source/i)) {
+                return true;
+              }
+            }
+          }
+
+          return false;
         },
         selector: 'img,video,picture,iframe,link.demand',
         ignoreSelector: '.nodemand',

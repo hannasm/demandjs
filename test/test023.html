@@ -22,6 +22,42 @@
         demandClassAttribute: 'data-demand',
         defaultDemandClass: 'default',
         enableOffloading: true,
+        createLoadingNode: function (tgt, info) {
+          var placeholderRoot = document.createElement('div');
+          placeholderRoot.style.position = 'relative';
+          placeholderRoot.style.display = 'inline-block';
+
+          var base = this.createLoadingNode(tgt,info);
+          base = Array.prototype.slice.call(base);
+          for (var i = 0; i < base.length; i++) {
+            var placeholder = base[i];
+            placeholderRoot.appendChild(placeholder);
+            if (info.isOffloading) {
+              placeholder.style.position = 'absolute';
+              placeholder.style.zIndex = 100;
+              placeholder.style.color = '#FFF';
+              placeholder.style.width = '100%';
+              placeholder.style.height = '100%';
+            }
+          }
+
+          if (info.isOffloading) {
+              var cvsSize = document.createElement('canvas');
+              cvsSize.width = info.demandWidth;
+              cvsSize.height = info.demandHeight;
+              var cvsSizeCtx = cvsSize.getContext('2d');
+              cvsSizeCtx.fillStyle = '#F00';
+              cvsSizeCtx.fillRect(0,0,cvsSize.width,cvsSize.height);
+
+              var offloadImg = document.createElement('img');
+              offloadImg.src = cvsSize.toDataURL('image/jpeg');
+              offloadImg.className = 'nodemand';
+              placeholderRoot.appendChild(offloadImg);
+
+          }
+
+          return [placeholderRoot];
+        },
         loadingHtml: {
           'default': '<div style="width:100%;height:100%">Loading In Progress</div>',
           'spinner': '<img src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />',
