@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.11
+/** @preserve DemandJS - v.1.0.0-rc.12
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -421,6 +421,7 @@
       onLoadComplete.call(this, target);
     }
     cleanupPlaceholders(registration) {
+      if (!registration) { return; }
       var {target, registration} = this.resolveTarget(registration);
       for (var i = 0; i < registration.placeholders.length; i++) {
         this.cleanupPlaceholder(registration.placeholders[i], false);
@@ -659,7 +660,7 @@
     }
     resolveTarget(target) {
       var registration = target;
-      if (!('isRegistration' in target) || !(target.isRegistration)) {
+      if (target && (!('isRegistration' in target) || !(target.isRegistration))) {
         registration = this.phRegistry.get(target);
       } else { 
         target = registration.target;

@@ -6,7 +6,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.11
+/** @preserve DemandJS - v.1.0.0-rc.12
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -507,6 +507,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'cleanupPlaceholders',
       value: function cleanupPlaceholders(registration) {
+        if (!registration) {
+          return;
+        }
+
         var _resolveTarget7 = this.resolveTarget(registration),
             target = _resolveTarget7.target,
             registration = _resolveTarget7.registration;
@@ -770,7 +774,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'resolveTarget',
       value: function resolveTarget(target) {
         var registration = target;
-        if (!('isRegistration' in target) || !target.isRegistration) {
+        if (target && (!('isRegistration' in target) || !target.isRegistration)) {
           registration = this.phRegistry.get(target);
         } else {
           target = registration.target;
