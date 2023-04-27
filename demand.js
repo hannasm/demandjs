@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.12
+/** @preserve DemandJS - v.1.0.0-rc.13
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -135,7 +135,7 @@
 
         var mc = this.isTargetMatch(target);
         if (mc.isMatch) {
-          this.observeTarget(target);
+          this.observeTarget(target, registration);
           return;
         }
       }
@@ -473,7 +473,7 @@
       registration.extraData.listeners.forEach(l=>target.removeEventListener(l.type, l.listener));
       for (var i = 0; i < registration.extraData.children.length; i++) {
         var child = registration.extraData.children[i];
-        this.cleanupRegistrationTarget(child);
+        this.cleanupRegistrationTarget(child.target);
       }
       var self = this;
       registration.elements.forEach(e=>{
@@ -688,6 +688,9 @@
       }
     }
     _restoreTargetInternal(target, extraData, shouldNotPredictUrl) {
+      if (extraData.isRestored) { return; }
+      extraData.isRestored = true;
+
       if (shouldNotPredictUrl === undefined) {
         shouldNotPredictUrl = false;
       }
@@ -725,9 +728,15 @@
       }
 
       if (extraData.insertToLoad) {
-        target.style.display = 'none';
         this.scrollSave();
-        document.body.appendChild(target);
+
+        var {registration} = this.resolveTarget(target);
+        if (!registration) {
+          throw 'unable to load element!';
+        }
+        var ph = registration.placeholders[0];
+        ph.parentNode.insertBefore(target, ph);
+
         this.scrollRestore();
       }
 
@@ -766,6 +775,7 @@
         'hasDisplay': target.style && target.style.display,
         'display': target.style.display || '',
         'children': [],
+        'isRestored': false,
         'shouldRestore': false,
         'canLoad': false,
         'shouldInjectLink': false,
