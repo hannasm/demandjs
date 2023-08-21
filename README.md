@@ -3,13 +3,15 @@
 
 ## Version
 
-1.0.0-rc.13 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.14 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Acknowledgement
 
 If you find this project useful and would like to make a contribution you may do so here.
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=hannasm%40gmail.com&item_name=demandjs&currency_code=USD)
+
+I am available for consulting, feedback and other opportunities, conact me at: [Resonance Development](https://rsndev.com/resume)
 
 ## Overview
 
@@ -335,6 +337,47 @@ An option `shouldInsertToLoad` is available to configure which elements should u
 
 If you identify any other cases where this alternative behavior is needed please report it using an issue!
 
+
+## Inject Node
+
+It is possible to intercept content before it is inserted into the DOM. This may have some benefits for images but was specifically created for cases where demand loading html content or other markup resources. Using this `injectNode()` callback, it is possible to inspect and potentially modify the DOM before it is inserted into the document and allows for ultimate control over modifying the content before it shows up on the page or triggers any further processing by the browser.
+
+```javascript
+    var options = {
+      injectNode: {
+        'addCors': function(i,t) { 
+          i.setAttribute('crossOrigin', 'anonymous');
+          this.injectNode(i,t);
+        },
+        'noAddCors': function(i,t) { 
+          this.injectNode(i,t);
+        }
+      }        
+    };
+```
+
+In this example anything annotated with the addCors demand class will have a `crossOrigin="anonymous"` attribute added to the markup before it is inserted into the DOM.
+
+*NOTE: Only the root of HTML trees are being passed to the `injectNode()` function. It may be necesarry to traverse the tree if some sub-node of the root is the  intended target of the DOM modification.*
+
+As with all demand classes, the default demand class may also be configured for nodes which do not have a demand class assigned.
+
+For a complete example [see test029](test/test029.html).
+
+## *Experimental* Progammatic Reload
+
+DemandJS supports a user / programmatically invoked reload function which resets all retry timers and re-inserts the content back into the DOM using the same process as used originally. This could be useful for a few cases:
+
+  * Network / Server Errors prevented content from loading
+  * Content has changed and needs to be reloaded
+
+*TODO: Tests covering these scenarios are needed*
+
+*TODO: Potentially want to support configurable query strings to override caching ?*
+
+*TODO: This functionality is still being actively tested and shouldnt be considered production ready yet*
+
+
 ## *Experimental* Resource Offloading
 
 Resource offloading is the process of removing images / other demand loaded elements from the page when they are no longer within view. This can help improve performance on pages with large amounts of content, and/or  on resource constrained devices.
@@ -434,11 +477,12 @@ See the configuration section below for some additional details about the config
   | rootMarginOuter | similar to root margin but defines the region outside of which elements are offloaded. this should be significantly larger the rootMargin, but ideal settings aren't quite clear yet | 2048px | no |
   | thresholdOuter | similar to threshold but defines the visibility threshold outside of which elements are offloaded | 0.001 | no |
   | shouldInsertToLoad | `function (target) {}` - this is called on each element as it is being captured and if returns true causes demandjs to remove the element from the DOM while it is off the screen, and insert it into the dom just before it would scroll into view. This is useful for certain elements like iframes and videos with source children that may have browser bugs or otherwise cause adverse side affects if left in the dom while not visible.  | iframe and video containg children will be insertToLoad, all others not | no |
+  | injectNode              | `function(injecting,target, context) {}` - this is called each time a node is being injected into the dom during HTML injection. it supports demand classes so may be either a single function, null, or map. It is always called with the DemandJS object as the this pointer, and except in certain incredibly rare scenarios should always call `this.injectNode(injecting,target)` at some point during execution to perform the actual injection. Please review the source code for list of context values, but unless you are really advanced this value probably doesnt matter to you.  | insert into DOM immmediately above the target | yes |
 
 
 ## Polyfill Dependencies
 You will need to polyfill any essential components if you want to use this library. There are some additional optional
-polyfills that are only required for specific features.
+polyfills that are only required for specific features. For most people polyfills shouldn't be needed these days.
 
 * WeakMap - essential
 * IntersectionObserver  - essential
@@ -504,9 +548,14 @@ It should be fairly easy to make assertions using some combination of properties
 * [test026](test/test026.html)
 * [test027](test/test027.html)
 * [test028](test/test028.html)
+* [test029](test/test029.html)
+
 
 ## Release Notes 
 
+* 1.0.0-rc.14 - bug fixes
+* 1.0.0-rc.14 - reload element function
+* 1.0.0-rc.14 - inject node callback
 * 1.0.0-rc.13 - bug fixes
 * 1.0.0-rc.12 - bug fixes
 * 1.0.0-rc.11 - bug fixes, more tests

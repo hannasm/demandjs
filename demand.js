@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.13
+/** @preserve DemandJS - v.1.0.0-rc.14
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -93,6 +93,8 @@
         var mutation = mutations[i];
         if (mutation.type !== 'attributes') { continue; }
         var node = mutation.target;
+        if (!this.hasRegistration(node)) { continue; }
+
         var aname = mutation.attributeName;
         var {target, registration} = this.resolveTarget(node);
 
@@ -211,6 +213,7 @@
       }
     }
     beginLoad(target) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
       if (registration.loading) { return; }
       registration.loading = true;
@@ -250,6 +253,7 @@
       return target.loaded || false;
     }
     injectLink(target, txt) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
 
       let previewLoading = this.selectByDemandClass(
@@ -304,17 +308,34 @@
       var content = '';
       document.write = c=>content += c;
 
-      var codeToExecute = new Function(code + "\n" + '//@ sourceURL=' + id);
+      var codeToExecute = new Function(code + "\n" + '//@ sourceURL=' + id + "\n" + '//# sourceURL=' + id);
       codeToExecute();
      
+
       if (content !== '') { 
+
+        if (!this.hasRegistration(target)) {
+          // registration is requried for injecting content so we create a dummy registration here, 
+          // may need to consider a better way to do this though
+          var registration = this.registerPlaceholder(target,target,[], {});
+          target.href = id;
+        }
+
         this.injectHtml(target, '<body>' + content + '</body>');
       }
 
       document.write = oldDw;
     }
     injectHtml(target, txt) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
+
+      var injectNode = this.selectByDemandClass(
+        target,
+        this.options.injectNode,
+        this.options.demandClassAttribute,
+        this.options.defaultDemandClass,
+        this.injectNode);
 
       var root = document.createElement('html');
       root.innerHTML = txt;
@@ -332,13 +353,16 @@
           });
           injectionId += 1;
           this.scrollSave();
-          target.parentNode.insertBefore(bc, target);
+          injectNode.call(this, bc, target);
           this.scrollRestore();
           if (registration && registration.elements) {
             registration.elements.push(bc);
           }
         }
       }
+    }
+    injectNode(injecting, target, context) {
+      target.parentNode.insertBefore(injecting, target);
     }
     isOffloadingEnabled(target) {
       return this.selectByDemandClass(
@@ -358,6 +382,7 @@
       return this.isOffloadingEnabled(target);
     }
     processSuccess(target) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
 
       let previewLoading = this.selectByDemandClass(
@@ -388,7 +413,13 @@
           registration.target.style.display = cap.display;
           registration.expectRemove = true;
           this.scrollSave();
-          ph.parentNode.insertBefore(registration.target, ph);
+          var injectNode = this.selectByDemandClass(
+            target,
+            this.options.injectNode,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.injectNode);
+          injectNode.call(this, registration.target, ph, 'processSuccess');
           this.scrollRestore();
       } else if (this.options.shouldInsertOnLoad(registration.target)) {
           var ph = registration.placeholders[0];
@@ -422,6 +453,7 @@
     }
     cleanupPlaceholders(registration) {
       if (!registration) { return; }
+      if (!this.hasRegistration(registration)) { return; }
       var {target, registration} = this.resolveTarget(registration);
       for (var i = 0; i < registration.placeholders.length; i++) {
         this.cleanupPlaceholder(registration.placeholders[i], false);
@@ -438,6 +470,7 @@
     }
 
     cleanupPlaceholder(placeholder, removeFromTarget) {
+      if (!this.hasRegistration(placeholder)) { return; }
       if (typeof removeFromTarget === 'undefined') {
         removeFromTarget = true;
       }
@@ -459,6 +492,7 @@
       }
     }
     cleanupRegistrationTarget(registration) {
+      if (!this.hasRegistration(registration)) { return; }
       var {target, registration} = this.resolveTarget(registration);
 
       this.cleanupPlaceholders(registration);
@@ -482,8 +516,18 @@
         self.scrollRestore();
       });
     }
-
+    reloadTarget(target) {
+      if (!this.hasRegistration(target)) { return; }
+      var {target, registration} = this.resolveTarget(target);
+      if (registration.loading && !registration.loaded) { return; } // already loading
+      registration.loading = false;
+      registration.loaded = false;
+      registration.retryCount=0;
+      this.clearAttributes(target, registration.extraData);
+      this.beginLoad(target);
+    }
     handleError(target, ex) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
 
       // error event being triggered twice
@@ -557,6 +601,7 @@
       //  nothing to do here
     }
     onLoadFailure(target, ex) {
+      if (!this.hasRegistration(target)) { return; }
         var {target, registration} = this.resolveTarget(target);
 
         var createFailureNode = this.selectByDemandClass(
@@ -576,7 +621,13 @@
           errReg.loaded = true;
 
           this.scrollSave();
-          target.parentNode.insertBefore(eui, target);
+          var injectNode = this.selectByDemandClass(
+            target,
+            this.options.injectNode,
+            this.options.demandClassAttribute,
+            this.options.defaultDemandClass,
+            this.injectNode);
+          injectNode.call(this, eui, target, 'loadFailure');
           this.scrollRestore();
         }
         if (this.options.shouldRemove(target)) {
@@ -671,6 +722,7 @@
       };
     }
     restoreTarget(target) {
+      if (!this.hasRegistration(target)) { return; }
       var {target, registration} = this.resolveTarget(target);
       var extraData = registration.extraData;
 
@@ -688,6 +740,7 @@
       }
     }
     _restoreTargetInternal(target, extraData, shouldNotPredictUrl) {
+      if (!this.hasRegistration(target)) { return; }
       if (extraData.isRestored) { return; }
       extraData.isRestored = true;
 
@@ -718,6 +771,7 @@
         if (!shouldNotPredictUrl) {
           src = this.predictUrl(target, src);
         }
+        //target.setAttribute('crossOrigin', ''); // TODO: trying to address issue with cors violation on reload of image
         target.setAttribute('src', src);
       }
       if (extraData.children.length > 0) {
@@ -735,7 +789,13 @@
           throw 'unable to load element!';
         }
         var ph = registration.placeholders[0];
-        ph.parentNode.insertBefore(target, ph);
+        var injectNode = this.selectByDemandClass(
+          target,
+          this.options.injectNode,
+          this.options.demandClassAttribute,
+          this.options.defaultDemandClass,
+          this.injectNode);
+        injectNode.call(this, target, ph, 'restoreTarget');
 
         this.scrollRestore();
       }
@@ -915,6 +975,7 @@
       arr.currentUsage -= prediction;
     }
     recordPerformance(target, failure) {
+      if (!this.hasRegistration(target)) { return; }
       var {registration, target} = this.resolveTarget(target);
       var ed = registration.extraData;
 
@@ -936,6 +997,7 @@
       }
     }
     predictUrl(target, url) {
+      if (!this.hasRegistration(target)) { return 'unknown'; }
       var {registration, target} = this.resolveTarget(target);
 
       var { suffix, alternatives } = this.getAlternatives(url);
@@ -1126,6 +1188,7 @@
         failureHtml: this.defaultFailureHtml,
         createLoadingNode: t=>this.createLoadingNode(t),
         createFailureNode: (t,ex)=>this.createFailureNode(t, ex),
+        injectNode: (i,t,r)=>this.injectNode(i,t,r),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
         shouldInsertToLoad: t=> {

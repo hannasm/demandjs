@@ -1,0 +1,38 @@
+<html>
+  <head>
+    <link rel='stylesheet' type="text/css" href='base.css' />
+    <script src='imagelist.js'></script>
+  </head>
+  <body>
+    <div id="insertBeforeMe"></div>
+    <script type="text/javascript">
+      for (var i = 0; i < window.test_images.length; i++) {
+        var filename = "test029a.html";
+        var demand = 'addCors';
+        if (i % 2 == 0) {
+          filename = "test029b.html";
+          demand = 'noAddCors';
+        }
+
+        document.write('<link rel="prefetch" class="demand" href="' + filename + '" type="text/html" data-demand="' + demand + '" /><br/>');
+      }
+    </script>
+    <script src="../demandjs.debug.js"></script>
+    <script type="text/javascript" language="javascript">
+      var options = {
+        demandClassAttribute: 'data-demand',
+        defaultDemandClass: 'noAddCors',
+        injectNode: {
+          'addCors': function(i,t) { 
+            i.setAttribute('crossOrigin', 'anonymous');
+            this.injectNode(i,t);
+          },
+          'noAddCors': function(i,t) { 
+            this.injectNode(i,t);
+          }
+        }        
+      };
+      window.DemandJSDemanded = new DemandJS(options);
+    </script>
+  </body>
+</html>

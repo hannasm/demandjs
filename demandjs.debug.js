@@ -6,7 +6,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-/** @preserve DemandJS - v.1.0.0-rc.12
+/** @preserve DemandJS - v.1.0.0-rc.14
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -121,6 +121,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             continue;
           }
           var node = mutation.target;
+          if (!this.hasRegistration(node)) {
+            continue;
+          }
+
           var aname = mutation.attributeName;
 
           var _resolveTarget2 = this.resolveTarget(node),
@@ -292,6 +296,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       value: function beginLoad(target) {
         var _this3 = this;
 
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
         var _resolveTarget3 = this.resolveTarget(target),
             target = _resolveTarget3.target,
             registration = _resolveTarget3.registration;
@@ -338,6 +346,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectLink',
       value: function injectLink(target, txt) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
         var _resolveTarget4 = this.resolveTarget(target),
             target = _resolveTarget4.target,
             registration = _resolveTarget4.registration;
@@ -396,10 +408,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           return content += c;
         };
 
-        var codeToExecute = new Function(code + "\n" + '//@ sourceURL=' + id);
+        var codeToExecute = new Function(code + "\n" + '//@ sourceURL=' + id + "\n" + '//# sourceURL=' + id);
         codeToExecute();
 
         if (content !== '') {
+
+          if (!this.hasRegistration(target)) {
+            // registration is requried for injecting content so we create a dummy registration here, 
+            // may need to consider a better way to do this though
+            var registration = this.registerPlaceholder(target, target, [], {});
+            target.href = id;
+          }
+
           this.injectHtml(target, '<body>' + content + '</body>');
         }
 
@@ -408,9 +428,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'injectHtml',
       value: function injectHtml(target, txt) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
         var _resolveTarget5 = this.resolveTarget(target),
             target = _resolveTarget5.target,
             registration = _resolveTarget5.registration;
+
+        var injectNode = this.selectByDemandClass(target, this.options.injectNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.injectNode);
 
         var root = document.createElement('html');
         root.innerHTML = txt;
@@ -428,13 +454,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             });
             injectionId += 1;
             this.scrollSave();
-            target.parentNode.insertBefore(bc, target);
+            injectNode.call(this, bc, target);
             this.scrollRestore();
             if (registration && registration.elements) {
               registration.elements.push(bc);
             }
           }
         }
+      }
+    }, {
+      key: 'injectNode',
+      value: function injectNode(injecting, target, context) {
+        target.parentNode.insertBefore(injecting, target);
       }
     }, {
       key: 'isOffloadingEnabled',
@@ -452,6 +483,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'processSuccess',
       value: function processSuccess(target) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
         var _resolveTarget6 = this.resolveTarget(target),
             target = _resolveTarget6.target,
             registration = _resolveTarget6.registration;
@@ -480,7 +515,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           registration.target.style.display = cap.display;
           registration.expectRemove = true;
           this.scrollSave();
-          ph.parentNode.insertBefore(registration.target, ph);
+          var injectNode = this.selectByDemandClass(target, this.options.injectNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.injectNode);
+          injectNode.call(this, registration.target, ph, 'processSuccess');
           this.scrollRestore();
         } else if (this.options.shouldInsertOnLoad(registration.target)) {
           var ph = registration.placeholders[0];
@@ -510,6 +546,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         if (!registration) {
           return;
         }
+        if (!this.hasRegistration(registration)) {
+          return;
+        }
 
         var _resolveTarget7 = this.resolveTarget(registration),
             target = _resolveTarget7.target,
@@ -535,6 +574,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'cleanupPlaceholder',
       value: function cleanupPlaceholder(placeholder, removeFromTarget) {
+        if (!this.hasRegistration(placeholder)) {
+          return;
+        }
         if (typeof removeFromTarget === 'undefined') {
           removeFromTarget = true;
         }
@@ -564,6 +606,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'cleanupRegistrationTarget',
       value: function cleanupRegistrationTarget(registration) {
+        if (!this.hasRegistration(registration)) {
+          return;
+        }
+
         var _resolveTarget9 = this.resolveTarget(registration),
             target = _resolveTarget9.target,
             registration = _resolveTarget9.registration;
@@ -577,7 +623,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           this.outersection.unobserve(target);
         }
         this.phRegistry.delete(target);
-        registration.extraData.wasCleanedUp = true;
         registration.extraData.listeners.forEach(function (l) {
           return target.removeEventListener(l.type, l.listener);
         });
@@ -593,11 +638,35 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         });
       }
     }, {
-      key: 'handleError',
-      value: function handleError(target, ex) {
+      key: 'reloadTarget',
+      value: function reloadTarget(target) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
         var _resolveTarget10 = this.resolveTarget(target),
             target = _resolveTarget10.target,
             registration = _resolveTarget10.registration;
+
+        if (registration.loading && !registration.loaded) {
+          return;
+        } // already loading
+        registration.loading = false;
+        registration.loaded = false;
+        registration.retryCount = 0;
+        this.clearAttributes(target, registration.extraData);
+        this.beginLoad(target);
+      }
+    }, {
+      key: 'handleError',
+      value: function handleError(target, ex) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
+        var _resolveTarget11 = this.resolveTarget(target),
+            target = _resolveTarget11.target,
+            registration = _resolveTarget11.registration;
 
         // error event being triggered twice
 
@@ -666,9 +735,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'onLoadFailure',
       value: function onLoadFailure(target, ex) {
-        var _resolveTarget11 = this.resolveTarget(target),
-            target = _resolveTarget11.target,
-            registration = _resolveTarget11.registration;
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
+        var _resolveTarget12 = this.resolveTarget(target),
+            target = _resolveTarget12.target,
+            registration = _resolveTarget12.registration;
 
         var createFailureNode = this.selectByDemandClass(target, this.options.createFailureNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.createFailureNode);
         var errorUI = createFailureNode.call(this, target, ex);
@@ -683,7 +756,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           errReg.loaded = true;
 
           this.scrollSave();
-          target.parentNode.insertBefore(eui, target);
+          var injectNode = this.selectByDemandClass(target, this.options.injectNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.injectNode);
+          injectNode.call(this, eui, target, 'loadFailure');
           this.scrollRestore();
         }
         if (this.options.shouldRemove(target)) {
@@ -788,9 +862,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'restoreTarget',
       value: function restoreTarget(target) {
-        var _resolveTarget12 = this.resolveTarget(target),
-            target = _resolveTarget12.target,
-            registration = _resolveTarget12.registration;
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
+        var _resolveTarget13 = this.resolveTarget(target),
+            target = _resolveTarget13.target,
+            registration = _resolveTarget13.registration;
 
         var extraData = registration.extraData;
 
@@ -806,6 +884,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: '_restoreTargetInternal',
       value: function _restoreTargetInternal(target, extraData, shouldNotPredictUrl) {
+        if (!this.hasRegistration(target)) {
+          return;
+        }
         if (extraData.isRestored) {
           return;
         }
@@ -838,27 +919,28 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           if (!shouldNotPredictUrl) {
             src = this.predictUrl(target, src);
           }
+          //target.setAttribute('crossOrigin', ''); // TODO: trying to address issue with cors violation on reload of image
           target.setAttribute('src', src);
         }
         if (extraData.children.length > 0) {
           for (var i = 0; i < extraData.children.length; i++) {
             var childData = extraData.children[i];
-            var childTarget = childData.target;
-            this._restoreTargetInternal(childTarget, childData, shouldNotPredictUrl);
+            this._restoreTargetInternal(childData.target, childData, shouldNotPredictUrl);
           }
         }
 
         if (extraData.insertToLoad) {
           this.scrollSave();
 
-          var _resolveTarget13 = this.resolveTarget(target),
-              registration = _resolveTarget13.registration;
+          var _resolveTarget14 = this.resolveTarget(target),
+              registration = _resolveTarget14.registration;
 
           if (!registration) {
             throw 'unable to load element!';
           }
           var ph = registration.placeholders[0];
-          ph.parentNode.insertBefore(target, ph);
+          var injectNode = this.selectByDemandClass(target, this.options.injectNode, this.options.demandClassAttribute, this.options.defaultDemandClass, this.injectNode);
+          injectNode.call(this, target, ph, 'restoreTarget');
 
           this.scrollRestore();
         }
@@ -885,9 +967,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         var store = {
           'target': target,
-          'parentElement': target.parentElement,
-          'prevSiblingElement': target.previousElementSibling,
-          'nextSiblingElement': target.nextElementSibling,
           'hasSrc': target.hasAttribute('src'),
           'src': target.getAttribute('src'),
           'hasSrcset': target.hasAttribute('srcset'),
@@ -1066,9 +1145,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'recordPerformance',
       value: function recordPerformance(target, failure) {
-        var _resolveTarget14 = this.resolveTarget(target),
-            registration = _resolveTarget14.registration,
-            target = _resolveTarget14.target;
+        if (!this.hasRegistration(target)) {
+          return;
+        }
+
+        var _resolveTarget15 = this.resolveTarget(target),
+            registration = _resolveTarget15.registration,
+            target = _resolveTarget15.target;
 
         var ed = registration.extraData;
 
@@ -1092,9 +1175,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'predictUrl',
       value: function predictUrl(target, url) {
-        var _resolveTarget15 = this.resolveTarget(target),
-            registration = _resolveTarget15.registration,
-            target = _resolveTarget15.target;
+        if (!this.hasRegistration(target)) {
+          return 'unknown';
+        }
+
+        var _resolveTarget16 = this.resolveTarget(target),
+            registration = _resolveTarget16.registration,
+            target = _resolveTarget16.target;
 
         var _getAlternatives = this.getAlternatives(url),
             suffix = _getAlternatives.suffix,
@@ -1247,9 +1334,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'isLoadedRecursive',
       value: function isLoadedRecursive(target, injecting) {
-        var _resolveTarget16 = this.resolveTarget(target),
-            target = _resolveTarget16.target,
-            registration = _resolveTarget16.registration;
+        var _resolveTarget17 = this.resolveTarget(target),
+            target = _resolveTarget17.target,
+            registration = _resolveTarget17.registration;
 
         if (typeof registration !== 'undefined' && registration && registration.loaded) {
           return { loaded: true, injecting: injecting || this.injecting.get(target) };
@@ -1334,6 +1421,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         },
         createFailureNode: function createFailureNode(t, ex) {
           return _this6.createFailureNode(t, ex);
+        },
+        injectNode: function injectNode(i, t, r) {
+          return _this6.injectNode(i, t, r);
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
