@@ -1006,7 +1006,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         // We do not care about load events of child elements
-        if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
+        if (('tagName' in target && target.tagName.match(/img/i) || store.hasSrc || store.hasSrcset) && target === targetRoot) {
           store.shouldRestore = true;
           store.canLoad = true;
 
@@ -1309,7 +1309,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           }
           var registration = this.registerPlaceholder(target, target, placeholders, store);
           this.attributeMutations.observe(target, this.attributeMutationOptions);
-          if (this.options.shouldRemove(target)) {
+          if (this.options.shouldAutoLoad(target)) {
+            this.beginLoad(registration);
+          } else if (this.options.shouldRemove(target)) {
             if (store.insertToLoad) {
               registration.expectRemove = true;
               this.scrollSave();
@@ -1427,6 +1429,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         },
         shouldRemove: function shouldRemove(t) {
           return !('tagName' in t) || !t.tagName.match(/link/i);
+        },
+        shouldAutoLoad: function shouldAutoLoad(t) {
+          return t.classList.contains('demandautoload') || t.hasAttribute('data-demand-autoload');
         },
         shouldInsertOnLoad: function shouldInsertOnLoad(t) {
           return _this6.options.shouldRemove(t);

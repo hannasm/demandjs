@@ -1,4 +1,4 @@
-/** @preserve DemandJS - v.1.0.0-rc.14
+/** @preserve DemandJS - v.1.0.0-rc.15
  *
  * https://github.com/hannasm/demandjs
  **/
@@ -856,7 +856,11 @@
 
 
       // We do not care about load events of child elements
-      if ((store.hasSrc || store.hasSrcset) && target === targetRoot) {
+      if (
+        (
+          ('tagName' in target && target.tagName.match(/img/i)) ||
+          (store.hasSrc || store.hasSrcset)
+        ) && target === targetRoot) {
         store.shouldRestore = true;
         store.canLoad = true;
      
@@ -1104,7 +1108,10 @@
         }
         var registration = this.registerPlaceholder(target, target, placeholders, store);
         this.attributeMutations.observe(target, this.attributeMutationOptions);
-        if (this.options.shouldRemove(target)) {
+        if (this.options.shouldAutoLoad(target)) {
+          this.beginLoad(registration);
+        }
+        else if (this.options.shouldRemove(target)) {
           if (store.insertToLoad) {
             registration.expectRemove = true;
             this.scrollSave();
@@ -1190,6 +1197,7 @@
         createFailureNode: (t,ex)=>this.createFailureNode(t, ex),
         injectNode: (i,t,r)=>this.injectNode(i,t,r),
         shouldRemove: t=>!('tagName' in t) || !(t.tagName.match(/link/i)),
+        shouldAutoLoad: t=>t.classList.contains('demandautoload') || t.hasAttribute('data-demand-autoload'),
         shouldInsertOnLoad: t=>this.options.shouldRemove(t),
         shouldInsertToLoad: t=> {
           if (!('tagName' in t)) { return false; }

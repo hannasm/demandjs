@@ -3,7 +3,7 @@
 
 ## Version
 
-1.0.0-rc.14 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
+1.0.0-rc.15 - we have reached a point where the intended features of this project are there. It is still unproven in production and requires some adoption and time to mature before it can be considered a stable release.
 
 ## Acknowledgement
 
@@ -445,6 +445,25 @@ Resource offloading supports demand classes [see test024](test/test024.html)
 
 See the configuration section below for some additional details about the configuration options available.
 
+## *Experimental* Autoload
+
+By default demandjs loads elements lazily as they are scrolled into view but there are cases where this lazy behavior is sub-optimal. 
+
+One alternative is to annotate the element with the nodemand class, which will disable / bypass demandjs completely.
+
+On the other hand there may be cases (in particular with loading non-media resources like html) where you want demandjs to execute but you don't want it to wait until the element scrolls into view to begin executing. In this case autoload comes into play.
+
+There are two ways to trigger autoloading.
+
+   * Annotate the appropriate element with the css class ```demandautoload```
+   * Annotate the appropriate element with the html attribute ```data-demand-autoload```
+
+In either case this is the switch that will cause demandjs to autoload elements immediately.
+
+* TODO: Code examples here
+* TODO: Test cases
+
+
 ## Configuration
 
   The DemandJS constructor accepts a single argument, which is the options collection. 
@@ -553,6 +572,8 @@ It should be fairly easy to make assertions using some combination of properties
 
 ## Release Notes 
 
+* 1.0.0-rc.15 - bug fixes
+* 1.0.0-rc.15 - new attribute demandautoload supports ability to bypass lazy loading for certain images
 * 1.0.0-rc.14 - bug fixes
 * 1.0.0-rc.14 - reload element function
 * 1.0.0-rc.14 - inject node callback
